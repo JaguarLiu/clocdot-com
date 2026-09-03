@@ -1,0 +1,401 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Company {
+  id                     String            @id @default(uuid())
+  name                   String
+  breakMinutes           Int               @default(60)
+  standardDailyMinutes   Int               @default(480) // 每日正常工時 (8h)
+  workdayWeekdays        Int[]             @default([1, 2, 3, 4, 5]) // ISO 1=Mon..7=Sun
+  restDayWeekdays        Int[]             @default([6])
+  regularLeaveWeekdays   Int[]             @default([7])
+  leavePolicyYearReset   String            @default("anniversary") // 'anniversary' | 'calendar'
+  flexibleOvertime       Boolean           @default(false) // true → 月上限 54h 且啟用每 3 個月 138h 滾動上限；false → 月上限 46h
+  workHourType           String            @default("flexible") // 'flexible' 變形工時 | 'fixed' 固定工時
+  lateDeductMode         String            @default("per_minute") // 固定工時扣薪: 'per_minute' 按分鐘比例 | 'per_hour' 按小時進位比例
+  approvalLevels         Int               @default(1) // 簽核層數 N（沿部門樹往上）
+  // Onsite 排班：cycle 週循環 + 每月固定日，聯集 = 需 onsite 的日子
+  // onsiteWeekdaysByCycle: [[1,3,5],[2,4,6]] = 雙週循環，週A 一三五、週B 二四六 (ISO 1=Mon..7=Sun)
+  // onsiteCycleWeeks=1 時 onsiteWeekdaysByCycle 預期長度為 1
+  // scheduleAnchorDate: 一個 Monday，定義「這週是 cycle index 0」的起算
+  // 全部空 = 不限制 (沿用既有遠端打卡)
+  onsiteCycleWeeks       Int               @default(1)
+  onsiteWeekdaysByCycle  Json              @default("[]")
+  onsiteMonthDays        Int[]             @default([])
+  scheduleAnchorDate     DateTime?         @db.Date
+  // WiFi 打卡：啟用後 onsite 必到日改以「來源 IP 命中 allowedIps」認定到公司 (取代 GPS)
+  wifiCheckinEnabled     Boolean           @default(false)
+  allowedIps             String[]          @default([]) // 單一 IP 或 CIDR，IPv4/IPv6
+  createdAt              DateTime          @default(now())
+  users                  User[]
+  locations              CompanyLocation[]
+  leavePolicies          LeavePolicy[]
+  issues                 Issue[]
+  dayExceptions          CompanyDayException[]
+  departments            Department[]
+  roles                  Role[]
+  shifts                 Shift[]
+
+  @@map("companies")
+}
+
+model LeavePolicy {
+  id                  String   @id @default(uuid())
+  companyId           String
+  leaveType           String   // enum 值 — annual / sick / personal / ...
+  annualQuotaMinutes  Int      // 每年額度 (分鐘) — 滿 1 年後給這個；特休未滿 1 年自動按到職日比例給予 (Math.ceil)
+  deductRate          Float?   // 該假別扣薪比例 0~1；null=用系統預設 (personal=1, sick=0.5, 其餘 0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  company             Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, leaveType])
+  @@map("leave_policies")
+}
+
+model CompanyLocation {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  address   String
+  lat       Float?
+  lng       Float?
+  radius    Int      @default(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   Company  @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@map("company_locations")
+}
+
+model User {
+  id                String             @id @default(uuid())
+  email             String             @unique
+  empNo             Int?               @unique
+  name              String?
+  avatar            String?
+  companyId         String?
+  timezone          String             @default("Asia/Taipei")
+  password          String?
+  failedLoginCount  Int                @default(0)
+  lockedAt          DateTime?
+  deletedAt         DateTime?
+  hireDate          DateTime?          @db.Date
+  employmentType    String             @default("regular") // 'regular' 正常班 | 'operation' 排班制 | 'parttime' 兼職
+  departmentId      String?
+  createdAt         DateTime           @default(now())
+  company           Company?           @relation(fields: [companyId], references: [id])
+  department         Department?       @relation("DeptMembers", fields: [departmentId], references: [id])
+  managedDepartments Department[]      @relation("DeptManager")
+  approvalSteps      ApprovalStep[]    @relation("StepApprover")
+  roleId             Int?
+  rbacRole           Role?             @relation("UserRole", fields: [roleId], references: [id])
+  defaultShiftId    String?
+  defaultShift      Shift?             @relation("UserDefaultShift", fields: [defaultShiftId], references: [id])
+  shiftAssignments  ShiftAssignment[]
+  attendanceRecords AttendanceRecord[]
+  leaveRequests     LeaveRequest[]
+  overtimeRequests  OvertimeRequest[]
+  issues            Issue[]
+  salaryProfile     SalaryProfile?
+  leaveCashouts     LeaveCashout[]
+
+  @@map("users")
+}
+
+model AttendanceRecord {
+  id                    String              @id @default(uuid())
+  userId                String
+  workDate              DateTime            @db.Date
+  punchIn               DateTime?
+  punchInLat            Float?
+  punchInLng            Float?
+  punchInLocationId     String?
+  punchInLocationType   String?
+  punchInIp             String?
+  punchOut              DateTime?
+  punchOutLat           Float?
+  punchOutLng           Float?
+  punchOutLocationId    String?
+  punchOutLocationType  String?
+  punchOutIp            String?
+  workDuration          Int?
+  isLate                Boolean             @default(false)
+  isEarlyLeave          Boolean             @default(false)
+  leaveType             String?
+  isHoliday             Boolean             @default(false)
+  createdAt             DateTime            @default(now())
+  user               User                @relation(fields: [userId], references: [id])
+  correctionRequests CorrectionRequest[]
+
+  @@unique([userId, workDate])
+  @@map("attendance_records")
+}
+
+model CorrectionRequest {
+  id           String           @id @default(uuid())
+  attendanceId String
+  reason       String
+  status       String           @default("pending")
+  createdAt    DateTime         @default(now())
+  attendance   AttendanceRecord @relation(fields: [attendanceId], references: [id])
+
+  @@map("correction_requests")
+}
+
+model WaitingList {
+  id          String   @id @default(uuid())
+  companyName String
+  contactName String
+  email       String
+  headcount   Int?
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@index([email])
+  @@map("waiting_list")
+}
+
+model LeaveRequest {
+  id        String   @id @default(uuid())
+  userId    String
+  leaveType String
+  startDate DateTime @db.Date
+  startTime String
+  endDate   DateTime @db.Date
+  endTime   String
+  reason    String?
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  reviewNote        String?
+  reviewedAt        DateTime?
+  reviewerId        String?
+  cancelRequested   Boolean   @default(false)
+  cancelReason      String?
+  cancelRequestedAt DateTime?
+
+  @@map("leave_requests")
+}
+
+model Issue {
+  id          String   @id @default(uuid())
+  title       String
+  type        String   // 'bug' | 'feature' — 後端白名單驗證
+  description String
+  status      String   @default("open") // 'open' | 'closed'
+  reporterId  String
+  companyId   String
+  createdAt   DateTime @default(now())
+  reporter    User     @relation(fields: [reporterId], references: [id])
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@map("issues")
+}
+
+model CompanyDayException {
+  id        String   @id @default(uuid())
+  companyId String
+  date      DateTime @db.Date
+  dayType   String   // 'workday'|'restday'|'regular_leave'|'national_holiday'
+  note      String?
+  createdAt DateTime @default(now())
+  company   Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, date])
+  @@index([companyId])
+  @@map("company_day_exceptions")
+}
+
+model OvertimeRequest {
+  id               String   @id @default(uuid())
+  userId           String
+  workDate         DateTime @db.Date
+  derivedMinutes   Int
+  requestedMinutes Int
+  dayType          String
+  tiers            Json
+  status           String   @default("pending") // pending|approved|rejected
+  reason           String?
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, workDate])
+  @@map("overtime_requests")
+}
+
+model SalaryProfile {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  baseSalary           Int?     // 本薪（月，TWD 整數）— 月薪制必填；PT 為 null
+  hourlyRate           Int?     // 時薪（TWD 整數）— PT 必填；月薪制為 null
+  allowances           Json     @default("[]") // [{name, amount, insured, taxable}]
+  laborInsuredSalary   Int?     // 勞保投保薪資（手動；子專案 B 建好後可帶級距）
+  healthInsuredSalary  Int?     // 健保投保薪資
+  healthDependents     Int      @default(0) // 健保眷口數
+  pensionVoluntaryRate Decimal  @default(0) @db.Decimal(4, 3) // 勞退自願提繳率 0~0.06
+  taxDependents        Int      @default(0) // 所得稅扶養人數
+  bankAccount          String?  // 匯款帳號（之後匯出用，可選）
+  note                 String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("salary_profiles")
+}
+
+model LeaveCashout {
+  id            String   @id @default(uuid())
+  companyId     String
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month         String   // 'YYYY-MM' — 對應 PayrollRun
+  effectiveDate DateTime @db.Date // 該月首日 (UTC)，供 policy-year 歸屬
+  minutes       Int      // 換掉的特休分鐘數
+  days          Decimal  @db.Decimal(5, 2) // 顯示用天數
+  dailyWage     Int      // round(monthlyWage / 30)
+  amount        Int      // round(days × dailyWage)
+  createdAt     DateTime @default(now())
+  createdById   String?
+
+  @@unique([userId, month])
+  @@map("leave_cashouts")
+}
+
+model PayrollRun {
+  id            String        @id @default(uuid())
+  companyId     String
+  month         String        // 'YYYY-MM'
+  status        String        @default("draft") // 'draft' | 'locked'
+  ratesSnapshot Json
+  lockedAt      DateTime?
+  lockedById    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  items         PayrollItem[]
+
+  @@unique([companyId, month])
+  @@map("payroll_runs")
+}
+
+model PayrollItem {
+  id               String     @id @default(uuid())
+  payrollRunId     String
+  run              PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  userId           String
+  empNo            Int?
+  name             String?
+  payslip          Json
+  adjustments      Json       @default("[]")
+  grossPay         Int
+  totalDeductions  Int
+  adjustmentsTotal Int        @default(0)
+  netPay           Int
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@unique([payrollRunId, userId])
+  @@map("payroll_items")
+}
+
+model Department {
+  id        String       @id @default(uuid())
+  companyId String
+  name      String
+  parentId  String?
+  managerId String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  company   Company      @relation(fields: [companyId], references: [id])
+  parent    Department?  @relation("DeptTree", fields: [parentId], references: [id])
+  children  Department[] @relation("DeptTree")
+  manager   User?        @relation("DeptManager", fields: [managerId], references: [id])
+  members   User[]       @relation("DeptMembers")
+  roles     Role[]
+
+  @@index([companyId])
+  @@index([parentId])
+  @@map("departments")
+}
+
+model Role {
+  id           Int      @id @default(autoincrement())
+  companyId    String
+  departmentId String?
+  name         String
+  isAdmin      Boolean  @default(false)
+  permissions  String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company      Company     @relation(fields: [companyId], references: [id])
+  department   Department? @relation(fields: [departmentId], references: [id])
+  members      User[]      @relation("UserRole")
+
+  @@unique([departmentId, name])
+  @@index([companyId])
+  @@index([departmentId])
+  @@map("roles")
+}
+
+model ApprovalStep {
+  id          String    @id @default(uuid())
+  requestType String    // 'leave' | 'correction' | 'overtime'
+  requestId   String
+  level       Int
+  approverId  String?
+  status      String    @default("pending") // pending|approved|rejected|skipped
+  note        String?
+  decidedAt   DateTime?
+  decidedById String?
+  createdAt   DateTime  @default(now())
+
+  approver    User?     @relation("StepApprover", fields: [approverId], references: [id])
+
+  @@index([requestType, requestId])
+  @@index([approverId, status])
+  @@map("approval_steps")
+}
+
+model Shift {
+  id           String    @id @default(uuid())
+  companyId    String
+  name         String    // 例：「一般班」「早班」
+  startTime    String    // "HH:mm"
+  endTime      String    // "HH:mm"；endTime < startTime 表跨夜班（翌日下班），不接受相等（見 services/schedule.js validateShiftPayload）
+  breakMinutes Int       @default(60)
+  isDefault    Boolean   @default(false) // 每公司至多一個（服務層強制）；新員工自動帶入
+  deletedAt    DateTime? // soft delete，保留歷史指派參照
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  company      Company   @relation(fields: [companyId], references: [id])
+  assignments  ShiftAssignment[]
+  defaultUsers User[]    @relation("UserDefaultShift")
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("shifts")
+}
+
+model ShiftAssignment {
+  id        String   @id @default(uuid())
+  userId    String
+  date      DateTime @db.Date
+  shiftId   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  shift     Shift    @relation(fields: [shiftId], references: [id])
+
+  @@unique([userId, date])
+  @@index([shiftId])
+  @@map("shift_assignments")
+}

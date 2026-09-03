@@ -1,0 +1,12 @@
+# 統一行尾:所有文字檔以 LF 入庫、LF checkout(Windows/WSL 混用環境防 CRLF 翻轉污染 diff)
+* text=auto eol=lf
+
+# 明確標記二進位(保險,git 的 auto 偵測通常也會判對)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary

@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+/* 中文字體：回到 bold + normal tracking，避免 font-black + tracking-tighter 擠壓 */
+.font-zh {
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.2);
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.35);
+}
+
+.animate-in {
+  animation-fill-mode: forwards;
+}
+
+.fade-in {
+  animation-name: fade-in;
+}
+
+.slide-in-from-bottom-4 {
+  transform: translateY(16px);
+  opacity: 0;
+  animation: slideIn 0.35s forwards;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes soft-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.animate-soft-bounce {
+  animation: soft-bounce 1.6s ease-in-out infinite;
+}
+
+/* ── 組織圖：上而下連線樹 (Office-desk org tree) ───────────────── */
+.org-tree,
+.org-tree__branch {
+  display: flex;
+  justify-content: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+.org-tree {
+  gap: 36px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.org-tree__branch {
+  padding-top: 26px;
+}
+.org-tree__node {
+  list-style: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px;
+}
+/* nodes nested under a parent get the connector gap above them */
+.org-tree__branch > .org-tree__node {
+  padding-top: 26px;
+}
+/* horizontal sibling bus + upward stub */
+.org-tree__branch > .org-tree__node::before,
+.org-tree__branch > .org-tree__node::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 26px;
+  border-top: 2px solid #d8d2c0;
+}
+.org-tree__branch > .org-tree__node::after {
+  right: auto;
+  left: 50%;
+  border-left: 2px solid #d8d2c0;
+}
+.org-tree__branch > .org-tree__node:first-child::before,
+.org-tree__branch > .org-tree__node:last-child::after {
+  border: 0 none;
+}
+.org-tree__branch > .org-tree__node:last-child::before {
+  border-right: 2px solid #d8d2c0;
+  border-radius: 0 7px 0 0;
+}
+.org-tree__branch > .org-tree__node:first-child::after {
+  border-radius: 7px 0 0 0;
+}
+/* lone child: just a straight vertical line, no horizontal bus */
+.org-tree__branch > .org-tree__node:only-child::before {
+  display: none;
+}
+.org-tree__branch > .org-tree__node:only-child::after {
+  display: block;
+  top: 0;
+  left: 50%;
+  right: auto;
+  width: 50%;
+  height: 26px;
+  border: 0 none;
+  border-left: 2px solid #d8d2c0;
+  border-radius: 0;
+}
+/* downward line dropping from a parent into its branch */
+.org-tree__branch::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 26px;
+  border-left: 2px solid #d8d2c0;
+}

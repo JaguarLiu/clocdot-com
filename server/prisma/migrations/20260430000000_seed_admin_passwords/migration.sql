@@ -1,0 +1,3 @@
+-- Intentionally empty.
+-- Never assign a shared administrator password in a migration. Bootstrap
+-- credentials must be unique to each deployment and invalidated after use.

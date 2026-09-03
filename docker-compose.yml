@@ -1,0 +1,97 @@
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    container_name: clocdot-postgres
+    environment:
+      POSTGRES_USER: clocdot
+      POSTGRES_PASSWORD: clocdot_dev_only
+      POSTGRES_DB: clocdot
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-dev:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clocdot -d clocdot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.4.9-alpine
+    container_name: clocdot-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    image: clocdot/server:local
+    container_name: clocdot-server
+    environment:
+      DATABASE_URL: postgresql://clocdot:clocdot_dev_only@postgres:5432/clocdot?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — set it in the shell env or a root .env file}
+      PORT: 3000
+      # client/admin 的 Caddy 是唯一一層反向代理，只信任這 1 跳。
+      # 注意：本檔也把 3000 直接對外，繞過 Caddy 直連時請勿信任 X-Forwarded-For。
+      TRUST_PROXY: "1"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    image: clocdot/client:local
+    container_name: clocdot-client
+    ports:
+      - "80:8080"
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /config:uid=10001,gid=10001,mode=0750
+      - /data:uid=10001,gid=10001,mode=0750
+
+  admin:
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
+    image: clocdot/admin:local
+    container_name: clocdot-admin
+    ports:
+      - "8080:8080"
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /config:uid=10001,gid=10001,mode=0750
+      - /data:uid=10001,gid=10001,mode=0750
+
+volumes:
+  postgres-dev:
+  redis-dev:

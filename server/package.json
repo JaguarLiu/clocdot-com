@@ -1,0 +1,35 @@
+{
+  "name": "@clocdot/server",
+  "private": true,
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=.env --watch src/app.js",
+    "start": "node --env-file-if-exists=.env src/app.js",
+    "test": "node --test",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:generate": "prisma generate",
+    "bootstrap:admin": "node --env-file-if-exists=.env scripts/bootstrap-admin.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@fastify/helmet": "^13.1.0",
+    "@fastify/jwt": "^10.2.2",
+    "@fastify/rate-limit": "^10.2.2",
+    "@prisma/adapter-pg": "^7.4.0",
+    "@prisma/client": "^7.4.0",
+    "bcryptjs": "^2.4.3",
+    "fastify": "^5.12.1",
+    "fastify-plugin": "^5.0.0",
+    "ioredis": "^5.10.1",
+    "ipaddr.js": "^2.4.0",
+    "pg": "^8.18.0",
+    "resend": "^4.0.1"
+  },
+  "devDependencies": {
+    "prisma": "^7.4.0"
+  }
+}

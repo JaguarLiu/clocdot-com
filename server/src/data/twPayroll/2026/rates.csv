@@ -1,0 +1,9 @@
+key,value
+laborOrdinaryRate,0.115
+employmentInsuranceRate,0.01
+laborEmployeeShare,0.2
+healthRate,0.0517
+healthEmployeeShare,0.3
+pensionRate,0.06
+incomeTaxThreshold,90501
+incomeTaxRate,0.05

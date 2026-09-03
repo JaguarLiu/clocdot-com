@@ -1,0 +1,3 @@
+-- Intentionally empty.
+-- Production migrations must not create organization-specific users or include
+-- personal data. Bootstrap the first company and administrator separately.

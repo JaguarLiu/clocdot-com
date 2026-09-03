@@ -1,0 +1,24 @@
+:8080 {
+	root * /srv
+	file_server
+
+	handle /api/* {
+		reverse_proxy server:3000
+	}
+
+	# Security headers (P1-4)
+	# - connect-src 允許 https:：API 部署在獨立網域時需要（見 VITE_API_BASE）
+	# - img-src 允許 https:：員工頭像為外部 URL
+	# - admin 不需要 geolocation
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), camera=(), microphone=()"
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	try_files {path} /index.html
+}

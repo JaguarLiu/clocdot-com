@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/* 中文字體：回到 bold + normal tracking，避免 font-black + tracking-tighter 擠壓 */
+.font-zh {
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 0px;
+}
+
+.animate-in {
+  animation-fill-mode: forwards;
+}
+
+.fade-in {
+  animation-name: fade-in;
+}
+
+.zoom-in {
+  animation-name: zoom-in;
+}
+
+.slide-in-from-bottom-4 {
+  transform: translateY(16px);
+  animation: slideIn 0.3s forwards;
+}
+
+.slide-in-from-right-4 {
+  transform: translateX(16px);
+  animation: slideInX 0.3s forwards;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes zoom-in {
+  from { transform: scale(0.95); }
+  to { transform: scale(1); }
+}
+
+@keyframes slideIn {
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideInX {
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* 柔和彈跳 — 首次提示用，幅度比 Tailwind animate-bounce 小 */
+@keyframes soft-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.animate-soft-bounce {
+  animation: soft-bounce 1.6s ease-in-out infinite;
+}
+
+/* 背景色塊極緩慢漂移 — 讓紙張「活起來」，不驚擾閱讀 */
+@keyframes blob-drift-1 {
+  0%, 100% { transform: translate(0, 0) rotate(-3deg); }
+  50%      { transform: translate(8px, -6px) rotate(-5deg); }
+}
+@keyframes blob-drift-2 {
+  0%, 100% { transform: translate(0, 0) rotate(6deg); }
+  50%      { transform: translate(-10px, 12px) rotate(8deg); }
+}
+@keyframes blob-drift-3 {
+  0%, 100% { transform: translate(0, 0) rotate(-6deg); }
+  50%      { transform: translate(12px, -8px) rotate(-4deg); }
+}
+.animate-blob-1 { animation: blob-drift-1 22s ease-in-out infinite; }
+.animate-blob-2 { animation: blob-drift-2 26s ease-in-out infinite; }
+.animate-blob-3 { animation: blob-drift-3 30s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-blob-1, .animate-blob-2, .animate-blob-3,
+  .animate-soft-bounce {
+    animation: none;
+  }
+}
+
+/* 3D flip utilities */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
