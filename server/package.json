@@ -19,7 +19,7 @@
     "@fastify/helmet": "^13.1.0",
     "@fastify/jwt": "^10.2.2",
     "@fastify/rate-limit": "^10.2.2",
-    "@prisma/adapter-pg": "^7.4.0",
+    "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.4.0",
     "bcryptjs": "^2.4.3",
     "fastify": "^5.12.1",
