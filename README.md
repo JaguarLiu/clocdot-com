@@ -299,6 +299,41 @@ API 統一使用 `/api` prefix，主要資源包含：
 
 路由的實際 request schema 與授權條件請以 [`server/src/routes`](server/src/routes) 為準。
 
+## 專案狀態與維護
+
+| 項目 | 現況 |
+|---|---|
+| 成熟度 | **pre-1.0，積極開發中**。資料模型與 API 可能在次版本間變更 |
+| 維護者 | [@JaguarLiu](https://github.com/JaguarLiu) |
+| 問題回報 | [GitHub Issues](https://github.com/JaguarLiu/clocdot-com/issues)（安全性問題請走 [SECURITY.md](SECURITY.md)） |
+| 變更紀錄 | [CHANGELOG.md](CHANGELOG.md)，破壞性變更會標註 **BREAKING** |
+| 正式環境採用 | 尚無公開的生產部署案例；導入前請自行完成評估與測試 |
+
+本專案由個人維護，並非商業產品，不提供服務等級保證或到府支援。
+
+### 已知限制
+
+- 未內建稽核日誌（誰在何時查看或修改了哪筆薪資紀錄）。
+- 沒有資料保存期限或自動刪除機制，個資刪除需直接操作資料庫，詳見 [PRIVACY.md](PRIVACY.md)。
+- 自動化測試集中在後端業務邏輯；前端與端對端流程尚未有瀏覽器整合測試。
+- 台灣假日與勞健保級距為年度資料，跨年度需手動更新，詳見 [`server/src/data/README.md`](server/src/data/README.md)。
+- 僅支援單一時區（`Asia/Taipei`）與繁體中文／英文兩種介面。
+- 本倉庫**不含**示範帳號、種子資料或截圖；請以自己的測試資料建立環境。
+
+### Roadmap
+
+無時程承諾，依實際需求調整優先序：
+
+- 稽核日誌與資料保存政策工具
+- 登入、API 與主要管理流程的瀏覽器整合測試
+- 假日與級距資料的年度更新自動化與驗證
+- 多時區與多語系擴充
+
+## 隱私與資料處理
+
+本系統處理位置、IP、出勤與薪資等個人資料。**部署者是個資的蒐集者與保有者**，
+請先閱讀 [PRIVACY.md](PRIVACY.md) 了解系統實際會收集、快取與保存哪些資料，再據以撰寫隱私政策。
+
 ## 參與貢獻與安全性
 
 提交變更前請閱讀 [CONTRIBUTING.md](CONTRIBUTING.md) 與 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。安全漏洞請依 [SECURITY.md](SECURITY.md) 私下回報，不要在公開 issue 張貼利用方式或敏感資料。

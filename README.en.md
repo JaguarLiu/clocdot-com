@@ -299,6 +299,41 @@ All API routes use the `/api` prefix. Main resources include:
 
 See [`server/src/routes`](server/src/routes) for the actual request schemas and authorization requirements.
 
+## Project status and maintenance
+
+| Item | Status |
+|---|---|
+| Maturity | **Pre-1.0, under active development.** Data model and API may change between minor versions |
+| Maintainer | [@JaguarLiu](https://github.com/JaguarLiu) |
+| Issues | [GitHub Issues](https://github.com/JaguarLiu/clocdot-com/issues) (security reports go through [SECURITY.md](SECURITY.md)) |
+| Changelog | [CHANGELOG.md](CHANGELOG.md); breaking changes are marked **BREAKING** |
+| Production use | No public production deployments yet. Evaluate and test before adopting |
+
+This is a personally maintained project, not a commercial product. There is no service-level guarantee or dedicated support.
+
+### Known limitations
+
+- No built-in audit log (who viewed or changed which payroll record, and when).
+- No data-retention or automatic deletion mechanism; erasing personal data requires direct database work. See [PRIVACY.md](PRIVACY.md).
+- Automated tests concentrate on backend business logic; there is no browser-based end-to-end coverage yet.
+- Taiwan holidays and insurance brackets are annual data and must be updated manually. See [`server/src/data/README.md`](server/src/data/README.md).
+- Single timezone (`Asia/Taipei`) and two locales (Traditional Chinese, English) only.
+- This repository ships **no** demo accounts, seed data, or screenshots. Build your environment with your own test data.
+
+### Roadmap
+
+No committed timeline; priorities shift with real demand.
+
+- Audit logging and data-retention tooling
+- Browser integration tests for login, API, and the main admin flows
+- Automated refresh and validation of annual holiday and bracket data
+- Multi-timezone and additional locale support
+
+## Privacy and data handling
+
+The system processes location, IP, attendance, and payroll data. **The deployer is the data controller.**
+Read [PRIVACY.md](PRIVACY.md) for exactly what is collected, cached, and retained before writing your own privacy policy.
+
 ## Contributing and security
 
 Before contributing, read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately according to [SECURITY.md](SECURITY.md); do not post exploit details or sensitive data in a public issue.

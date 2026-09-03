@@ -42,11 +42,11 @@ export default function PaperToast({ variant = 'success', message, onDismiss, du
           boxShadow: '3px 4px 10px rgba(0,0,0,0.08)',
         }}
       >
-        {/* 頂部膠帶 */}                                                                                                                                                                                                                                                 
-        <div                                                                                                                                                                                                                                                             
-         className="absolute -top-2 left-1/2 -translate-x-1/2 w-10 h-4 bg-white/50 border border-white/30 backdrop-blur-[1px]"                                                                                                                                          
-         style={{ transform: 'rotate(-4deg)', boxShadow: '1px 1px 2px rgba(0,0,0,0.04)' }}                                                                                                                                                                              
-        />                
+        {/* 頂部膠帶 */}
+        <div
+         className="absolute -top-2 left-1/2 -translate-x-1/2 w-10 h-4 bg-white/50 border border-white/30 backdrop-blur-[1px]"
+         style={{ transform: 'rotate(-4deg)', boxShadow: '1px 1px 2px rgba(0,0,0,0.04)' }}
+        />
         <Icon size={18} className={style.iconColor} strokeWidth={3} />
         <span className={`font-zh text-sm ${style.text}`}>{message}</span>
       </div>

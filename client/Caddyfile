@@ -1,9 +1,14 @@
 :8080 {
-	root * /srv
-	file_server
-
+	# API 先比對；handle 之間互斥，避免靜態檔的 try_files 把 /api/* 改寫掉
 	handle /api/* {
 		reverse_proxy server:3000
+	}
+
+	# SPA：找不到實體檔就回 index.html
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
 	}
 
 	# Security headers (P1-4)
@@ -20,6 +25,4 @@
 		Strict-Transport-Security "max-age=31536000"
 		-Server
 	}
-
-	try_files {path} /index.html
 }

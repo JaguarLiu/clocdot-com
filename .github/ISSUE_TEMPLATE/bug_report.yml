@@ -1,0 +1,74 @@
+name: 錯誤回報 / Bug report
+description: 回報功能不如預期的問題
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        請勿在此貼上真實的員工、出勤、薪資資料或任何憑證。
+        Do not paste real employee, attendance, or payroll data, or any credentials.
+
+        安全性漏洞請改走 [SECURITY.md](../blob/main/SECURITY.md) 的私下通報流程。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 發生了什麼 / What happened
+      description: 實際行為與你預期的行為
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 重現步驟 / Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. 看到錯誤 ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 受影響範圍 / Affected area
+      multiple: true
+      options:
+        - 員工端 PWA (client)
+        - 管理後台 (admin)
+        - API (server)
+        - 資料庫 / migration
+        - Docker / 部署
+        - 文件
+        - 不確定
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / Version
+      description: commit SHA 或 tag
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 環境 / Environment
+      description: Node 版本、作業系統、瀏覽器、以 Docker 或本機執行
+      placeholder: |
+        Node: 22.x
+        OS: Ubuntu 24.04
+        瀏覽器: Chrome 140
+        執行方式: docker compose
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相關 log 或錯誤訊息 / Logs
+      description: 貼上前請先移除憑證與個資
+      render: text

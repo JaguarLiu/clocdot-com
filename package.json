@@ -22,7 +22,11 @@
     "db:migrate": "npm run db:migrate --workspace @clocdot/server",
     "db:push": "npm run db:push --workspace @clocdot/server",
     "db:studio": "npm run db:studio --workspace @clocdot/server",
-    "bootstrap:admin": "npm run bootstrap:admin --workspace @clocdot/server"
+    "bootstrap:admin": "npm run bootstrap:admin --workspace @clocdot/server",
+    "license:report": "node scripts/license-report.mjs",
+    "license:check": "node scripts/license-report.mjs --check",
+    "format": "node scripts/check-format.mjs",
+    "format:fix": "node scripts/check-format.mjs --fix"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"

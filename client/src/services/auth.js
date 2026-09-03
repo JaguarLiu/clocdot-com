@@ -1,6 +1,7 @@
 import i18n from '../i18n/index.js'
 
-const API_BASE = import.meta.env.VITE_API_BASE || '/api'
+// optional chaining：Vite 建置時會注入 import.meta.env，但在 node --test 下不存在
+const API_BASE = import.meta.env?.VITE_API_BASE || '/api'
 
 /** server 依此標頭決定錯誤訊息語言（見 server/src/plugins/i18n.js） */
 function acceptLanguage() {

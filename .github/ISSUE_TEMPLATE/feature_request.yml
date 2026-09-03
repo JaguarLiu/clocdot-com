@@ -1,0 +1,50 @@
+name: 功能建議 / Feature request
+description: 提出新功能或改進
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        本專案為 pre-1.0，資料模型與 API 仍可能變動。提案前建議先看 README 的專案狀態與 roadmap。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解決什麼問題 / What problem does this solve
+      description: 請描述實際遇到的情境，而非直接描述解法
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建議做法 / Proposed solution
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 相關範圍 / Area
+      multiple: true
+      options:
+        - 員工端 PWA (client)
+        - 管理後台 (admin)
+        - API (server)
+        - 台灣法規／薪資計算
+        - Docker / 部署
+        - 文件
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 考慮過的替代方案 / Alternatives considered
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: 適用性 / Applicability
+      options:
+        - label: 這個需求對其他部署者也有普遍價值，而不只是單一公司的客製需求

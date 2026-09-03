@@ -1,6 +1,7 @@
 import i18n from '../i18n/index.js'
 
-const API_BASE = import.meta.env.VITE_API_BASE || '/api'
+// optional chaining：Vite 建置時會注入 import.meta.env，但在 node --test 下不存在
+const API_BASE = import.meta.env?.VITE_API_BASE || '/api'
 
 async function request(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`
