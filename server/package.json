@@ -26,8 +26,7 @@
     "fastify-plugin": "^5.0.0",
     "ioredis": "^5.10.1",
     "ipaddr.js": "^2.4.0",
-    "pg": "^8.23.0",
-    "resend": "^4.0.1"
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "prisma": "^7.4.0"

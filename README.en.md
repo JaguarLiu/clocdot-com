@@ -6,8 +6,6 @@ ClocDot is a multi-tenant HR, attendance, and payroll management system designed
 
 The default time zone is `Asia/Taipei`. The project includes reference data for Taiwan's 2026 public holidays, labor and health insurance, and labor pension contributions.
 
-> **Project status: active development.** A stable 1.0 release has not yet been published, and the data model and API may change. This repository contains no demo accounts or real HR data; use the secure bootstrap flow below to create the first administrator in a new environment.
-
 ## Features
 
 ### Employee app
@@ -48,7 +46,6 @@ The default time zone is `Asia/Taipei`. The project includes reference data for 
 - Taiwan overtime, rest-day, regular-day-off, and one-day-off-in-seven compliance checks
 - Redis caching and rate limiting, with graceful degradation when Redis is unavailable
 - Request schema validation, security headers, and centralized error handling
-- Resend email notifications
 
 ## Technology stack
 
@@ -73,7 +70,6 @@ flowchart LR
   Admin -->|REST /api| API
   API --> DB[(PostgreSQL)]
   API --> Redis[(Redis)]
-  API --> Mail[Resend]
 ```
 
 The three workspaces share one API and database:
@@ -96,7 +92,7 @@ ClocDot/
 │   ├── src/
 │   │   ├── routes/         Fastify REST endpoints
 │   │   ├── services/       Attendance, leave, approval, compliance, and payroll logic
-│   │   ├── plugins/        Prisma, Redis, JWT, i18n, and email
+│   │   ├── plugins/        Prisma, Redis, JWT, and i18n
 │   │   ├── data/           Taiwan holiday and payroll reference data
 │   │   └── utils/          Time zone, tenancy, IP, CSV, and other utilities
 │   ├── prisma/             Schema, migrations, and data-maintenance SQL
@@ -213,11 +209,6 @@ The complete example is available in [`.env.example`](.env.example).
 | `CORS_ORIGINS` | Production | Comma-separated allowed origins containing the public client and admin URLs. Falls back to `CLIENT_URL`, then `http://localhost:5173,http://localhost:5174` |
 | `TRUST_PROXY` | Behind a proxy | Whether to trust `X-Forwarded-For`. Unset = not trusted (socket address only); a number = reverse-proxy hop count; or a comma-separated list of proxy IPs/CIDRs. `request.ip` drives Wi-Fi check-in, so `true` lets clients forge their source IP |
 | `GOOGLE_MAPS_API_KEY` | No | Address geocoding |
-| `RESEND_API_KEY` | No | Resend API key; email is disabled when omitted |
-| `NOTIFY_FROM` | No | Notification sender address |
-| `NOTIFY_TO` | No | Waiting-list/application notification recipient |
-| `APPLY_DAILY_CAP_PER_IP` | No | Daily per-IP limit for the public application form |
-| `APPLY_GLOBAL_DAILY_CAP` | No | Global daily limit for the public application form |
 | `BOOTSTRAP_COMPANY_NAME` | For bootstrap | Name of the first company; used only by `npm run bootstrap:admin` |
 | `BOOTSTRAP_ADMIN_EMAIL` | For bootstrap | Email of the first administrator |
 | `BOOTSTRAP_ADMIN_NAME` | For bootstrap | Name of the first administrator |
@@ -303,13 +294,9 @@ See [`server/src/routes`](server/src/routes) for the actual request schemas and 
 
 | Item | Status |
 |---|---|
-| Maturity | **Pre-1.0, under active development.** Data model and API may change between minor versions |
 | Maintainer | [@JaguarLiu](https://github.com/JaguarLiu) |
 | Issues | [GitHub Issues](https://github.com/JaguarLiu/clocdot-com/issues) (security reports go through [SECURITY.md](SECURITY.md)) |
-| Changelog | [CHANGELOG.md](CHANGELOG.md); breaking changes are marked **BREAKING** |
-| Production use | No public production deployments yet. Evaluate and test before adopting |
 
-This is a personally maintained project, not a commercial product. There is no service-level guarantee or dedicated support.
 
 ### Known limitations
 
@@ -319,15 +306,6 @@ This is a personally maintained project, not a commercial product. There is no s
 - Taiwan holidays and insurance brackets are annual data and must be updated manually. See [`server/src/data/README.md`](server/src/data/README.md).
 - Single timezone (`Asia/Taipei`) and two locales (Traditional Chinese, English) only.
 - This repository ships **no** demo accounts, seed data, or screenshots. Build your environment with your own test data.
-
-### Roadmap
-
-No committed timeline; priorities shift with real demand.
-
-- Audit logging and data-retention tooling
-- Browser integration tests for login, API, and the main admin flows
-- Automated refresh and validation of annual holiday and bracket data
-- Multi-timezone and additional locale support
 
 ## Privacy and data handling
 

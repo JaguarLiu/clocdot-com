@@ -6,13 +6,11 @@ import prismaPlugin from './plugins/prisma.js'
 import redisPlugin from './plugins/redis.js'
 import authPlugin from './plugins/auth.js'
 import i18nPlugin from './plugins/i18n.js'
-import mailerPlugin from './plugins/mailer.js'
 import authRoutes from './routes/auth.js'
 import attendanceRoutes from './routes/attendance.js'
 import correctionRoutes from './routes/correction.js'
 import adminRoutes from './routes/admin.js'
 import leaveRoutes from './routes/leave.js'
-import applyRoutes from './routes/apply.js'
 import overtimeRoutes from './routes/overtime.js'
 import holidayRoutes from './routes/holidays.js'
 import payrollRoutes from './routes/payroll.js'
@@ -64,7 +62,6 @@ fastify.setErrorHandler((err, request, reply) => {
 await fastify.register(prismaPlugin)
 await fastify.register(redisPlugin)
 await fastify.register(authPlugin)
-await fastify.register(mailerPlugin)
 
 // Routes
 await fastify.register(authRoutes)
@@ -72,7 +69,6 @@ await fastify.register(attendanceRoutes)
 await fastify.register(correctionRoutes)
 await fastify.register(adminRoutes)
 await fastify.register(leaveRoutes)
-await fastify.register(applyRoutes)
 await fastify.register(overtimeRoutes)
 await fastify.register(holidayRoutes)
 await fastify.register(payrollRoutes)

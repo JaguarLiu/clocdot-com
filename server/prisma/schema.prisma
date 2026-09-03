@@ -149,19 +149,6 @@ model CorrectionRequest {
   @@map("correction_requests")
 }
 
-model WaitingList {
-  id          String   @id @default(uuid())
-  companyName String
-  contactName String
-  email       String
-  headcount   Int?
-  note        String?
-  createdAt   DateTime @default(now())
-
-  @@index([email])
-  @@map("waiting_list")
-}
-
 model LeaveRequest {
   id        String   @id @default(uuid())
   userId    String

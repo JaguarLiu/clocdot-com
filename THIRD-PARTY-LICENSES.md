@@ -1,8 +1,8 @@
 # 第三方套件授權報告
 
-產生時間：2026-09-03T02:12:19.074Z
+產生時間：2026-09-03T04:46:57.295Z
 本專案授權：Apache-2.0
-Production 相依套件數（含遞移）：212
+Production 相依套件數（含遞移）：195
 
 > 本檔由 `npm run license:report` 依已安裝的 `node_modules` 產生，只涵蓋 production 相依
 > （devDependencies 不隨發布散布）。發布新版本前請重新產生。
@@ -12,12 +12,11 @@ Production 相依套件數（含遞移）：212
 
 | 授權 | 套件數 |
 |---|---:|
-| MIT | 157 |
+| MIT | 144 |
 | ISC | 23 |
 | Apache-2.0 | 11 |
 | BlueOak-1.0.0 | 6 |
 | BSD-3-Clause | 5 |
-| BSD-2-Clause | 4 |
 | MIT/X11 | 2 |
 | Unlicense | 1 |
 | UNKNOWN | 1 |
@@ -42,7 +41,7 @@ Production 相依套件數（含遞移）：212
 | @fast-csv/format | 4.3.5 | MIT | LICENSE |
 | @fast-csv/parse | 4.3.6 | MIT | LICENSE |
 | @fastify/ajv-compiler | 4.0.5 | MIT | LICENSE |
-| @fastify/cors | 11.2.0 | MIT | LICENSE |
+| @fastify/cors | 11.3.0 | MIT | LICENSE |
 | @fastify/error | 4.2.0 | MIT | LICENSE |
 | @fastify/fast-json-stringify-compiler | 5.0.3 | MIT | LICENSE |
 | @fastify/forwarded | 3.0.1 | MIT | LICENSE |
@@ -60,8 +59,6 @@ Production 相依套件數（含遞移）：212
 | @prisma/client-runtime-utils | 7.8.0 | Apache-2.0 | LICENSE |
 | @prisma/debug | 7.8.0 | Apache-2.0 | LICENSE |
 | @prisma/driver-adapter-utils | 7.8.0 | Apache-2.0 | LICENSE |
-| @react-email/render | 1.1.2 | MIT | license.md |
-| @selderee/plugin-htmlparser2 | 0.11.0 | MIT | LICENSE |
 | @types/node | 25.6.0 | MIT | LICENSE |
 | @types/pg | 8.20.0 | MIT | LICENSE |
 | abstract-logging | 2.0.1 | MIT | — |
@@ -96,17 +93,11 @@ Production 相依套件數（含遞移）：212
 | cross-spawn | 7.0.6 | MIT | LICENSE |
 | dayjs | 1.11.23 | MIT | LICENSE |
 | debug | 4.4.3 | MIT | LICENSE |
-| deepmerge | 4.3.1 | MIT | license.txt |
 | denque | 2.1.0 | Apache-2.0 | LICENSE |
 | dequal | 2.0.3 | MIT | license |
-| dom-serializer | 2.0.0 | MIT | LICENSE |
-| domelementtype | 2.3.0 | BSD-2-Clause | LICENSE |
-| domhandler | 5.0.3 | BSD-2-Clause | LICENSE |
-| domutils | 3.2.2 | BSD-2-Clause | LICENSE |
 | duplexer2 | 0.1.4 | BSD-3-Clause | LICENSE.md |
 | ecdsa-sig-formatter | 1.0.11 | Apache-2.0 | LICENSE |
 | end-of-stream | 1.4.5 | MIT | LICENSE |
-| entities | 4.5.0 | BSD-2-Clause | LICENSE |
 | exceljs | 4.4.0 | MIT | LICENSE |
 | fast-csv | 4.3.6 | MIT | LICENSE |
 | fast-decode-uri-component | 1.0.1 | MIT | LICENSE |
@@ -129,8 +120,6 @@ Production 相依套件數（含遞移）：212
 | graceful-fs | 4.2.11 | ISC | LICENSE |
 | helmet | 8.3.0 | MIT | LICENSE |
 | html-parse-stringify | 4.0.1 | MIT | LICENSE |
-| html-to-text | 9.0.5 | MIT | LICENSE |
-| htmlparser2 | 8.0.2 | MIT | LICENSE |
 | i18next | 26.3.6 | MIT | LICENSE |
 | i18next-browser-languagedetector | 8.2.1 | MIT | LICENSE |
 | ieee754 | 1.2.1 | BSD-3-Clause | LICENSE |
@@ -144,7 +133,6 @@ Production 相依套件數（含遞移）：212
 | json-schema-traverse | 0.4.1 | MIT | LICENSE |
 | jszip | 3.10.1 | (MIT OR GPL-3.0-or-later) | LICENSE.markdown |
 | lazystream | 1.0.1 | MIT | LICENSE |
-| leac | 0.6.0 | MIT | LICENSE |
 | lie | 3.3.0 | MIT | license.md |
 | light-my-request | 6.6.0 | BSD-3-Clause | LICENSE |
 | listenercount | 1.0.1 | ISC | LICENSE.md |
@@ -177,15 +165,13 @@ Production 相依套件數（含遞移）：212
 | once | 1.4.0 | ISC | LICENSE |
 | package-json-from-dist | 1.0.1 | BlueOak-1.0.0 | LICENSE.md |
 | pako | 1.0.11 | (MIT AND Zlib) | LICENSE |
-| parseley | 0.12.1 | MIT | LICENSE |
 | path-key | 3.1.1 | MIT | license |
 | path-scurry | 2.0.2 | BlueOak-1.0.0 | LICENSE.md |
-| peberminta | 0.9.0 | MIT | LICENSE |
-| pg | 8.20.0 | MIT | LICENSE |
-| pg-connection-string | 2.12.0 | MIT | LICENSE |
+| pg | 8.23.0 | MIT | LICENSE |
+| pg-connection-string | 2.14.0 | MIT | LICENSE |
 | pg-int8 | 1.0.1 | ISC | LICENSE |
-| pg-pool | 3.13.0 | MIT | LICENSE |
-| pg-protocol | 1.13.0 | MIT | LICENSE |
+| pg-pool | 3.14.0 | MIT | LICENSE |
+| pg-protocol | 1.16.0 | MIT | LICENSE |
 | pg-types | 2.2.0 | MIT | — |
 | pgpass | 1.0.5 | MIT | — |
 | pino | 10.3.1 | MIT | LICENSE |
@@ -195,13 +181,11 @@ Production 相依套件數（含遞移）：212
 | postgres-bytea | 1.0.1 | MIT | license |
 | postgres-date | 1.0.7 | MIT | license |
 | postgres-interval | 1.2.0 | MIT | license |
-| prettier | 3.8.3 | MIT | LICENSE |
 | process-warning | 5.1.0 | MIT | LICENSE |
 | quick-format-unescaped | 4.0.4 | MIT | LICENSE |
-| react | 19.2.5 | MIT | LICENSE |
-| react-dom | 19.2.5 | MIT | LICENSE |
+| react | 19.2.8 | MIT | LICENSE |
+| react-dom | 19.2.8 | MIT | LICENSE |
 | react-i18next | 17.0.11 | MIT | LICENSE |
-| react-promise-suspense | 0.3.4 | MIT | LICENSE |
 | react-router | 7.18.3 | MIT | LICENSE.md |
 | react-router-dom | 7.18.3 | MIT | LICENSE.md |
 | readable-stream | 3.6.2 | MIT | LICENSE |
@@ -210,7 +194,6 @@ Production 相依套件數（含遞移）：212
 | redis-errors | 1.2.0 | MIT | LICENSE |
 | redis-parser | 3.0.0 | MIT | LICENSE |
 | require-from-string | 2.0.2 | MIT | license |
-| resend | 4.8.0 | MIT | LICENSE |
 | reusify | 1.1.0 | MIT | LICENSE |
 | rfdc | 1.4.1 | MIT | LICENSE |
 | rimraf | 2.7.1 | ISC | LICENSE |
@@ -221,7 +204,6 @@ Production 相依套件數（含遞移）：212
 | saxes | 5.0.1 | ISC | — |
 | scheduler | 0.27.0 | MIT | LICENSE |
 | secure-json-parse | 4.1.0 | BSD-3-Clause | LICENSE |
-| selderee | 0.11.0 | MIT | LICENSE |
 | semver | 6.3.1 | ISC | LICENSE |
 | set-cookie-parser | 2.7.2 | MIT | LICENSE |
 | setimmediate | 1.0.5 | MIT | LICENSE.txt |
@@ -233,7 +215,7 @@ Production 相依套件數（含遞移）：212
 | standard-as-callback | 2.1.0 | MIT | LICENSE |
 | steed | 1.1.3 | MIT | LICENSE |
 | string_decoder | 1.3.0 | MIT | LICENSE |
-| swr | 2.4.1 | MIT | LICENSE |
+| swr | 2.5.1 | MIT | LICENSE |
 | tar-stream | 2.2.0 | MIT | LICENSE |
 | thread-stream | 4.0.0 | MIT | LICENSE |
 | tmp | 0.2.7 | MIT | LICENSE |

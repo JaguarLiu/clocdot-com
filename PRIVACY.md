@@ -88,8 +88,9 @@ options: { cacheName: 'api-cache', expiration: { maxEntries: 50, maxAgeSeconds: 
 
 | 功能 | 送出的資料 | 對象 | 啟用條件 |
 |---|---|---|---|
-| 通知信 | 收件者 email、通知內容 | Resend | 設定 `RESEND_API_KEY` |
 | 地址轉座標 | 你輸入的公司地址 | Google Maps API | 設定 `GOOGLE_MAPS_API_KEY` |
+
+系統**不會外寄任何郵件**，因此不會有員工或申請人的 email 被送往第三方郵件服務。
 
 未設定上述金鑰時，這些功能停用，不會有任何對外傳輸。系統**不含**任何分析、追蹤或遙測程式碼。
 

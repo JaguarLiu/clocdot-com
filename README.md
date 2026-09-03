@@ -2,11 +2,11 @@
 
 [繁體中文](README.md) | [English](README.en.md)
 
-ClocDot 是為台灣中小企業設計的多租戶人資、差勤與薪資管理系統。涵蓋打卡、排班、請假、加班、簽核、組織權限、薪資結算及薪資單。
+ClocDot 是為中小企業設計的多租戶人資、差勤與薪資管理系統。涵蓋打卡、排班、請假、加班、簽核、組織權限、薪資結算及薪資單。
 
 目前預設時區為 `Asia/Taipei`，並內建 2026 年台灣國定假日與勞健保／勞退參考資料。
 
-> **專案狀態：積極開發中。** 尚未發布穩定的 1.0 版本，資料模型與 API 可能變更。倉庫不包含示範帳號或真實人資資料；新環境請使用下方的安全 bootstrap 流程建立第一位管理員。
+> 
 
 ## 主要功能
 
@@ -48,7 +48,6 @@ ClocDot 是為台灣中小企業設計的多租戶人資、差勤與薪資管理
 - 台灣加班、休息日、例假及七休一等合規檢查
 - Redis 快取與 rate-limit；Redis 無法使用時可降級運作
 - 請求 schema 驗證、安全 headers 及通用錯誤處理
-- Resend 通知郵件整合
 
 ## 技術選型
 
@@ -73,7 +72,6 @@ flowchart LR
   Admin -->|REST /api| API
   API --> DB[(PostgreSQL)]
   API --> Redis[(Redis)]
-  API --> Mail[Resend]
 ```
 
 三個 workspace 共用同一套 API 與資料庫：
@@ -96,7 +94,7 @@ Clocdot/
 │   ├── src/
 │   │   ├── routes/         Fastify REST endpoints
 │   │   ├── services/       差勤、假勤、簽核、法遵與薪資邏輯
-│   │   ├── plugins/        Prisma、Redis、JWT、i18n、郵件
+│   │   ├── plugins/        Prisma、Redis、JWT、i18n
 │   │   ├── data/           台灣假日及薪資級距資料
 │   │   └── utils/          時區、租戶、IP、CSV 等工具
 │   ├── prisma/             Schema、migration 與資料修正 SQL
@@ -213,11 +211,6 @@ Vite 開發伺服器會把 `/api` proxy 到 `http://localhost:3000`。
 | `CORS_ORIGINS` | 正式環境必要 | 允許來源，以逗號分隔，須含 client 與 admin 的對外網址。未設定時 fallback 為 `CLIENT_URL`，再退回 `http://localhost:5173,http://localhost:5174`，正式環境等同全部被擋 |
 | `TRUST_PROXY` | 反向代理後必要 | 是否信任 `X-Forwarded-For`。未設定＝不信任（僅用連線來源 IP）；數字＝反向代理跳數；亦可填逗號分隔的 proxy IP/CIDR。`request.ip` 是 Wi-Fi 打卡的判準，設成 `true` 會讓用戶端可自行偽造來源 IP |
 | `GOOGLE_MAPS_API_KEY` | 否 | 地址 geocoding |
-| `RESEND_API_KEY` | 否 | Resend API key；缺少時郵件功能停用 |
-| `NOTIFY_FROM` | 否 | 通知信寄件者 |
-| `NOTIFY_TO` | 否 | waiting list／申請通知收件者 |
-| `APPLY_DAILY_CAP_PER_IP` | 否 | 公開申請表的單 IP 每日上限 |
-| `APPLY_GLOBAL_DAILY_CAP` | 否 | 公開申請表的全域每日上限 |
 | `BOOTSTRAP_COMPANY_NAME` | bootstrap 時 | 第一間公司名稱；僅 `npm run bootstrap:admin` 使用 |
 | `BOOTSTRAP_ADMIN_EMAIL` | bootstrap 時 | 第一位管理員 email |
 | `BOOTSTRAP_ADMIN_NAME` | bootstrap 時 | 第一位管理員姓名 |
@@ -303,13 +296,9 @@ API 統一使用 `/api` prefix，主要資源包含：
 
 | 項目 | 現況 |
 |---|---|
-| 成熟度 | **pre-1.0，積極開發中**。資料模型與 API 可能在次版本間變更 |
 | 維護者 | [@JaguarLiu](https://github.com/JaguarLiu) |
 | 問題回報 | [GitHub Issues](https://github.com/JaguarLiu/clocdot-com/issues)（安全性問題請走 [SECURITY.md](SECURITY.md)） |
-| 變更紀錄 | [CHANGELOG.md](CHANGELOG.md)，破壞性變更會標註 **BREAKING** |
-| 正式環境採用 | 尚無公開的生產部署案例；導入前請自行完成評估與測試 |
 
-本專案由個人維護，並非商業產品，不提供服務等級保證或到府支援。
 
 ### 已知限制
 
@@ -319,15 +308,6 @@ API 統一使用 `/api` prefix，主要資源包含：
 - 台灣假日與勞健保級距為年度資料，跨年度需手動更新，詳見 [`server/src/data/README.md`](server/src/data/README.md)。
 - 僅支援單一時區（`Asia/Taipei`）與繁體中文／英文兩種介面。
 - 本倉庫**不含**示範帳號、種子資料或截圖；請以自己的測試資料建立環境。
-
-### Roadmap
-
-無時程承諾，依實際需求調整優先序：
-
-- 稽核日誌與資料保存政策工具
-- 登入、API 與主要管理流程的瀏覽器整合測試
-- 假日與級距資料的年度更新自動化與驗證
-- 多時區與多語系擴充
 
 ## 隱私與資料處理
 
