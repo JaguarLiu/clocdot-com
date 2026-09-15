@@ -59,7 +59,8 @@ export default defineConfig({
               cacheName: 'api-cache',
               expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24,
+                // 2 小時 — 只當離線 fallback，過久的舊資料寧可不給
+                maxAgeSeconds: 60 * 60 * 2,
               },
             },
           },

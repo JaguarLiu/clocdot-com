@@ -50,7 +50,9 @@
     "leaveTitle": "請假申請",
     "overtimeTitle": "加班申請",
     "payslipTitle": "薪資單",
-    "profileTitle": "個人中心"
+    "profileTitle": "個人中心",
+    "clockStyleTitle": "打卡鐘樣式",
+    "activityTitle": "我的紀錄"
   },
   "login": {
     "logoAlt": "公司標誌",
@@ -254,6 +256,20 @@
     "notificationSettings": "系統通知設定",
     "logout": "Logout Account"
   },
+  "clockStyle": {
+    "title": "打卡鐘樣式",
+    "classic": "經典打卡機",
+    "puppy": "小狗 Shiro",
+    "allStyles": "所有樣式",
+    "allStylesEn": "ALL STYLES"
+  },
+  "logoutConfirm": {
+    "title": "還有打卡沒送出",
+    "titleEn": "PENDING PUNCHES",
+    "body": "你有 {{count}} 筆離線打卡還沒送到伺服器。現在登出會把它們一起清掉，之後要走補卡流程才補得回來。連上網路後回到打卡頁，它們會自動送出。",
+    "stay": "先留下來，等它送出",
+    "discard": "仍要登出（丟棄這些打卡）"
+  },
   "password": {
     "title": "修改密碼",
     "titleEn": "Change Password",
@@ -290,5 +306,86 @@
     "timeout": "定位逾時，訊號可能太弱，請走到窗邊再試",
     "unsupported": "此裝置不支援定位",
     "generic": "無法取得位置"
+  },
+  "progress": {
+    "show": "查看進度",
+    "hide": "收起進度",
+    "loadFailed": "進度暫時載入不了，稍後再試試",
+    "stepsTitle": "簽核關卡",
+    "stepsCode": "APPROVAL",
+    "timelineTitle": "時間軸",
+    "timelineCode": "TIMELINE",
+    "noSteps": "這筆申請沒有簽核關卡紀錄",
+    "noEvents": "這筆申請還沒有時間軸紀錄",
+    "level": "第 {{level}} 關",
+    "noApprover": "未指派主管",
+    "tone": {
+      "approved": "已核准",
+      "rejected": "已駁回",
+      "skipped": "管理員直接決議",
+      "current": "簽核中",
+      "waiting": "等待中"
+    },
+    "byAdmin": "管理員",
+    "actor": "由 {{name}}",
+    "action": {
+      "leave_submitted": "送出請假申請",
+      "leave_withdrawn": "撤回申請",
+      "leave_cancel_requested": "申請取消假單",
+      "leave_cancel_confirmed": "取消已核准",
+      "leave_cancel_rejected": "取消未核准，假單維持有效",
+      "leave_approved": "請假已核准",
+      "leave_rejected": "請假已駁回",
+      "correction_submitted": "送出補卡申請",
+      "correction_approved": "補卡已核准",
+      "correction_rejected": "補卡已駁回",
+      "overtime_submitted": "送出加班申請",
+      "overtime_resubmitted": "重新送出加班申請",
+      "overtime_approved": "加班已核准",
+      "overtime_rejected": "加班已駁回",
+      "approval_step_approved": "第 {{level}} 關核准",
+      "approval_step_rejected": "第 {{level}} 關駁回",
+      "unknown": "申請有更新"
+    }
+  },
+  "activity": {
+    "title": "我的紀錄",
+    "filterAria": "紀錄類別",
+    "loadFailed": "紀錄暫時載入不了，稍後再試試",
+    "empty": "這裡還空空的，打個卡就會出現紀錄囉",
+    "loadMore": "看更早的紀錄",
+    "end": "已經是最早的紀錄了",
+    "filter": {
+      "all": "全部",
+      "attendance": "打卡",
+      "request": "申請",
+      "account": "帳號安全"
+    },
+    "offline": "離線補送",
+    "replacedPunchOut": "更新了下班時間（原本 {{time}}）",
+    "byOthers": "由 {{name}} 處理",
+    "viewRequest": "看申請",
+    "yes": "是",
+    "no": "否",
+    "field": {
+      "punchIn": "上班",
+      "punchOut": "下班",
+      "workDuration": "工時",
+      "isLate": "遲到",
+      "isEarlyLeave": "早退",
+      "leaveType": "假別",
+      "isHoliday": "假日"
+    },
+    "action": {
+      "attendance_punched_in": "上班打卡",
+      "attendance_punched_out": "下班打卡",
+      "attendance_corrected": "補卡通過，出勤已更新",
+      "attendance_edited": "出勤紀錄被調整",
+      "auth_password_changed": "你變更了密碼",
+      "user_password_reset": "管理員幫你重設了密碼",
+      "user_unlocked": "帳號已解鎖",
+      "unknown": "有一筆新紀錄"
+    },
+    "fieldLabel": "{{field}}："
   }
 }

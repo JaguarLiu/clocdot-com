@@ -15,6 +15,7 @@ import { registerOrganizationRoutes } from './admin/organization.js'
 import { registerReportingRoutes } from './admin/reporting.js'
 import { registerPayrollRoutes } from './admin/payroll.js'
 import { registerEmployeeRoutes } from './admin/employees.js'
+import { registerAuditLogRoutes } from './admin/auditLogs.js'
 import { adminSchemas as S } from './admin/schemas.js'
 
 export default async function adminRoutes(fastify) {
@@ -215,4 +216,5 @@ export default async function adminRoutes(fastify) {
   registerLeavePolicyRoutes(fastify, S)
   registerEmployeeAccessRoutes(fastify, S)
   registerIssueRoutes(fastify, S)
+  registerAuditLogRoutes(fastify)
 }

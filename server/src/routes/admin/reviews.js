@@ -5,6 +5,7 @@ import {
   assertOwnedByCompany, reviewScopedByUser, reviewScopedByAttendanceUser, assertInScope,
 } from '../../utils/tenant.js'
 import { adminFinalize } from '../../services/approvalEngine.js'
+import { auditContext, writeAudit } from '../../services/audit.js'
 
 export function registerReviewRoutes(fastify, S, { assembleOvertimeCompliance }) {
 // PATCH /api/admin/correction-requests/:id
@@ -29,6 +30,7 @@ fastify.patch('/api/admin/correction-requests/:id', { preHandler: fastify.requir
   if (!decision) return reply.code(400).send({ error: 'status 必須為 approved 或 rejected' })
   const result = await adminFinalize(fastify.prisma, {
     requestType: 'correction', requestId: id, decision, decidedById: request.user.id,
+    audit: auditContext(request),
   })
   if (!result.ok) return reply.code(result.code).send(result.body)
   return result.body
@@ -124,10 +126,19 @@ fastify.patch('/api/admin/leave-requests/:id', { preHandler: fastify.requireModu
     if (!canDecideCancel(existing)) {
       return reply.code(400).send({ error: '此申請目前沒有待處理的取消請求' })
     }
+    const audit = auditContext(request)
+    const auditEntry = {
+      entityType: 'leave', entityId: id, targetUserId: existing.userId,
+      meta: { reviewNote: reviewMeta.reviewNote, cancelReason: existing.cancelReason ?? null },
+    }
     if (action === 'confirm-cancel') {
-      const updated = await fastify.prisma.leaveRequest.update({
-        where: { id },
-        data: { status: 'cancelled', cancelRequested: false, ...reviewMeta },
+      const updated = await fastify.prisma.$transaction(async (tx) => {
+        const u = await tx.leaveRequest.update({
+          where: { id },
+          data: { status: 'cancelled', cancelRequested: false, ...reviewMeta },
+        })
+        await writeAudit(tx, audit, { ...auditEntry, action: 'leave.cancel_confirmed' })
+        return u
       })
       // status 離開 approved ⇒ 餘額自動退還；同步清除考勤標記
       await clearLeaveFromAttendance(fastify.prisma, {
@@ -139,10 +150,14 @@ fastify.patch('/api/admin/leave-requests/:id', { preHandler: fastify.requireModu
       return updated
     }
     // reject-cancel：維持 approved，僅清旗標
-    return fastify.prisma.leaveRequest.update({
-      where: { id },
-      data: { cancelRequested: false, ...reviewMeta },
-    })
+    const [updated] = await fastify.prisma.$transaction([
+      fastify.prisma.leaveRequest.update({
+        where: { id },
+        data: { cancelRequested: false, ...reviewMeta },
+      }),
+      writeAudit(fastify.prisma, audit, { ...auditEntry, action: 'leave.cancel_rejected' }),
+    ])
+    return updated
   }
 
   // ── 一般審核分支 (approve/reject) ──
@@ -152,6 +167,7 @@ fastify.patch('/api/admin/leave-requests/:id', { preHandler: fastify.requireModu
   const decision = status === 'approved' ? 'approve' : 'reject'
   const result = await adminFinalize(fastify.prisma, {
     requestType: 'leave', requestId: id, decision, note: reviewNote, decidedById: request.user.id,
+    audit: auditContext(request),
   })
   if (!result.ok) return reply.code(result.code).send(result.body)
   return result.body
@@ -206,6 +222,7 @@ fastify.patch('/api/admin/overtime-requests/:id', { preHandler: fastify.requireM
   const decision = status === 'approved' ? 'approve' : 'reject'
   const result = await adminFinalize(fastify.prisma, {
     requestType: 'overtime', requestId: id, decision, decidedById: request.user.id, confirm: confirm === true,
+    audit: auditContext(request),
   })
   if (!result.ok) return reply.code(result.code).send(result.body)
   return result.body

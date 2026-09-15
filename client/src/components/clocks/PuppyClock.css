@@ -1,0 +1,17 @@
+/* Scoped to the puppy clock; animation never triggers or completes a request. */
+.puppy-clock { --puppy-brown: #6b4a2f; --puppy-brown-soft: #85603f; display: flex; flex-direction: column; align-items: center; width: min(78%, 300px); padding: 0; margin: 0 auto; border: 0; background: transparent; color: var(--puppy-brown); cursor: pointer; -webkit-tap-highlight-color: transparent; font: inherit; }
+.puppy-clock:focus-visible { outline: 3px dashed var(--puppy-brown-soft); outline-offset: 8px; border-radius: 24px; }
+.puppy-clock:disabled { cursor: wait; }
+.puppy-clock-stage { position: relative; display: block; width: 80%; aspect-ratio: 424 / 532; transition: transform .2s ease; }
+.puppy-clock:active .puppy-clock-stage { transform: scale(.96); }
+.puppy-clock-ground { position: absolute; left: 12%; right: 12%; bottom: 1%; height: 6%; background: #42391a20; border-radius: 50%; filter: blur(6px); }
+/* Size, left/bottom and background size/position come from spriteStyle() so every sheet registers to the same bowl anchor. */
+.puppy-clock-sprite { position: absolute; background-repeat: no-repeat; }
+.puppy-clock-time { display: flex; align-items: baseline; gap: 4px; margin-top: 6px; font: 900 44px/1.1 ui-monospace, "Courier New", monospace; letter-spacing: -.06em; font-variant-numeric: tabular-nums; }
+.puppy-clock-seconds { font-size: 18px; letter-spacing: -.02em; color: var(--puppy-brown-soft); }
+.puppy-clock-action { margin-top: 4px; font-size: 12px; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; }
+.puppy-clock-date { margin-top: 2px; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--puppy-brown-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  .puppy-clock-stage { transition: none; }
+}

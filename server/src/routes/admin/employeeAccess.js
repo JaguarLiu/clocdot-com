@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { assertOwnedByCompany } from '../../utils/tenant.js'
 import { buildBalances } from '../../services/leaveBalance.js'
+import { auditContext, writeAudit } from '../../services/audit.js'
 
 const PASSWORD_MIN_LENGTH = 8
 const BCRYPT_ROUNDS = 10
@@ -32,18 +33,25 @@ fastify.post('/api/admin/users/:id/unlock', { preHandler: fastify.requireModule(
   const target = await assertOwnedByCompany(
     (uid) => fastify.prisma.user.findUnique({
       where: { id: uid },
-      select: { id: true, companyId: true },
+      select: { id: true, companyId: true, failedLoginCount: true, lockedAt: true },
     }),
     id, request.companyId, reply,
     (rec) => rec.companyId,
   )
   if (!target) return
 
-  return fastify.prisma.user.update({
-    where: { id },
-    data: { failedLoginCount: 0, lockedAt: null },
-    select: { id: true, email: true, failedLoginCount: true, lockedAt: true },
-  })
+  const [updated] = await fastify.prisma.$transaction([
+    fastify.prisma.user.update({
+      where: { id },
+      data: { failedLoginCount: 0, lockedAt: null },
+      select: { id: true, email: true, failedLoginCount: true, lockedAt: true },
+    }),
+    writeAudit(fastify.prisma, auditContext(request), {
+      action: 'user.unlocked', entityType: 'user', entityId: id, targetUserId: id,
+      before: { failedLoginCount: target.failedLoginCount, lockedAt: target.lockedAt },
+    }),
+  ])
+  return updated
 })
 
 // PUT /api/admin/users/:id/password — 管理員設/重設使用者密碼
@@ -66,10 +74,15 @@ fastify.put('/api/admin/users/:id/password', { preHandler: fastify.requireModule
   if (!target) return
 
   const hash = await bcrypt.hash(password, BCRYPT_ROUNDS)
-  await fastify.prisma.user.update({
-    where: { id },
-    data: { password: hash, failedLoginCount: 0, lockedAt: null },
-  })
+  await fastify.prisma.$transaction([
+    fastify.prisma.user.update({
+      where: { id },
+      data: { password: hash, failedLoginCount: 0, lockedAt: null },
+    }),
+    writeAudit(fastify.prisma, auditContext(request), {
+      action: 'user.password_reset', entityType: 'user', entityId: id, targetUserId: id,
+    }),
+  ])
   return { ok: true }
 })
 

@@ -1,6 +1,7 @@
 import { toCSV, formatTimeInTZ, formatDateUTC } from '../../utils/csv.js'
 import { scopedByUser, assertOwnedByCompany } from '../../utils/tenant.js'
 import { getTodayStart } from '../../utils/timezone.js'
+import { auditContext, diffFields, writeAudit } from '../../services/audit.js'
 
 export function registerReportingRoutes(fastify, S, { assembleSettlement }) {
 // GET /api/admin/settlement?month=YYYY-MM
@@ -236,7 +237,17 @@ fastify.patch('/api/admin/attendance/:id', { preHandler: fastify.requireModule('
   if (leaveType !== undefined) data.leaveType = leaveType
   if (isHoliday !== undefined) data.isHoliday = isHoliday
 
-  return fastify.prisma.attendanceRecord.update({ where: { id }, data })
+  const change = diffFields(existing, data)
+  if (!change) return fastify.prisma.attendanceRecord.findUnique({ where: { id } })
+  const [updated] = await fastify.prisma.$transaction([
+    fastify.prisma.attendanceRecord.update({ where: { id }, data }),
+    writeAudit(fastify.prisma, auditContext(request), {
+      action: 'attendance.edited', entityType: 'attendance', entityId: id,
+      targetUserId: existing.userId, ...change,
+      meta: { workDate: existing.workDate },
+    }),
+  ])
+  return updated
 })
 
 }

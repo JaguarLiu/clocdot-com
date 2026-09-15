@@ -7,6 +7,7 @@ import {
   computeLeaveMinutes, computePolicyYearBounds, getUsedMinutes, resolveQuotaMinutes,
 } from './leaveBalance.js'
 import { evaluateOvertimeCompliance, sumCountedMinutes } from './compliance.js'
+import { diffFields, writeAudit } from './audit.js'
 
 // 核准請假：餘額檢查 → 寫狀態 → 套用扣假/出勤
 async function approveLeave(prisma, { requestId, decidedById, note }) {
@@ -50,7 +51,7 @@ async function approveLeave(prisma, { requestId, decidedById, note }) {
 }
 
 // 核准補卡：解析 reason → 更新出勤 → 寫狀態
-async function approveCorrection(prisma, { requestId }) {
+async function approveCorrection(prisma, { requestId, audit }) {
   const correction = await prisma.correctionRequest.findUnique({
     where: { id: requestId },
     include: { attendance: { include: { user: { include: { company: true } } } } },
@@ -90,6 +91,14 @@ async function approveCorrection(prisma, { requestId }) {
       punchIn, punchOut, shift, workDate: attendance.workDate, timezone,
     }))
     await prisma.attendanceRecord.update({ where: { id: correction.attendanceId }, data: updateData })
+    const change = diffFields(attendance, updateData)
+    if (change) {
+      await writeAudit(prisma, audit, {
+        action: 'attendance.corrected', entityType: 'attendance', entityId: correction.attendanceId,
+        targetUserId: attendance.userId, companyId: attendance.user?.companyId ?? undefined,
+        ...change, meta: { correctionId: requestId },
+      })
+    }
   }
   return { ok: true }
 }
@@ -143,9 +152,9 @@ async function approveOvertime(prisma, { requestId, confirm }) {
  * 對某申請套用「核准」副作用並把 status 設為 approved。
  * @returns {Promise<{ok:true} | {ok:false, code:number, body:object}>}
  */
-export async function applyApprovalEffects(prisma, { requestType, requestId, decidedById, note, confirm }) {
+export async function applyApprovalEffects(prisma, { requestType, requestId, decidedById, note, confirm, audit = null }) {
   if (requestType === 'leave') return approveLeave(prisma, { requestId, decidedById, note })
-  if (requestType === 'correction') return approveCorrection(prisma, { requestId })
+  if (requestType === 'correction') return approveCorrection(prisma, { requestId, audit })
   if (requestType === 'overtime') return approveOvertime(prisma, { requestId, confirm })
   return { ok: false, code: 400, body: { error: '未知的申請類型' } }
 }

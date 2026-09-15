@@ -46,8 +46,18 @@ export async function changePassword(currentPassword, newPassword) {
   return res.json()
 }
 
+/**
+ * 登出：清掉 token，並抹掉 service worker 的 API 回應快取。
+ * api-cache 存的是帶身分的 GET 回應（見 vite.config.js runtimeCaching），
+ * 不清的話同一台裝置換人登入、又剛好離線時會讀到前一個人的資料。
+ * 離線打卡佇列不在這裡清 —— 那是使用者資料，要先問過（見 AuthContext）。
+ */
 export function logout() {
   localStorage.removeItem('auth_token')
+  // Cache API 在非安全來源／舊瀏覽器可能不存在；失敗不該擋住登出
+  if (typeof caches !== 'undefined') {
+    caches.delete('api-cache').catch(() => {})
+  }
 }
 
 export function getStoredToken() {

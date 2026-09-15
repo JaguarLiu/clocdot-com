@@ -14,6 +14,7 @@ const Employees = lazy(() => import('./pages/Employees.jsx'))
 const Settings = lazy(() => import('./pages/Settings.jsx'))
 const Payroll = lazy(() => import('./pages/Payroll.jsx'))
 const Schedule = lazy(() => import('./pages/Schedule.jsx'))
+const AuditLog = lazy(() => import('./pages/AuditLog.jsx'))
 
 function Loading() {
   const { t } = useTranslation()
@@ -64,6 +65,7 @@ export default function App() {
           {/* 班別管理已整合進排班頁（modal），舊路徑導向 */}
           <Route path="shifts" element={<Navigate to="/schedule" replace />} />
           <Route path="payroll" element={<ModuleRoute module="payroll"><Payroll /></ModuleRoute>} />
+          <Route path="audit-log" element={<ModuleRoute module="audit-log"><AuditLog /></ModuleRoute>} />
           <Route path="settings" element={<ModuleRoute module="settings"><Settings /></ModuleRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

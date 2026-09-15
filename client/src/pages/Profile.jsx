@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { User, MapPin, Calendar, Settings, ChevronRight, History, KeyRound, Timer, Wallet, ClipboardCheck } from 'lucide-react'
+import { User, MapPin, Calendar, Settings, ChevronRight, History, KeyRound, Timer, Wallet, ClipboardCheck, ScrollText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import useSWR from 'swr'
 import { useAuth } from '../hooks/useAuth.js'
 import { useAttendanceHistory } from '../hooks/useAttendance.js'
 import PaperPiece from '../components/PaperPiece.jsx'
 import ChangePasswordModal from '../components/ChangePasswordModal.jsx'
+import LogoutConfirmModal from '../components/LogoutConfirmModal.jsx'
 import LanguageSwitcher from '../components/LanguageSwitcher.jsx'
+import { useClockStyle } from '../hooks/useClockStyle.js'
 import { fetcher } from '../services/api.js'
+import { listQueue } from '../services/offlineQueue.js'
 
 function formatYMD(iso) {
   if (!iso) return '—'
@@ -34,6 +37,19 @@ export default function Profile() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [showChangePassword, setShowChangePassword] = useState(false)
+  const [clockStyle] = useClockStyle()
+  // 有未送出的離線打卡就先問過再登出（登出會連佇列一起清）
+  const [pendingPunches, setPendingPunches] = useState(null)
+
+  function handleLogout() {
+    const queued = listQueue()
+    if (queued.length > 0) {
+      setPendingPunches(queued)
+      return
+    }
+    logout()
+    navigate('/login')
+  }
 
   const now = new Date()
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -152,6 +168,18 @@ export default function Profile() {
           </PaperPiece>
         </button>
 
+        <button type="button" onClick={() => navigate('/activity')} className="w-full text-left active:scale-95 transition-transform">
+          <PaperPiece color="white" rotate="0.5deg" className="p-4 flex items-center justify-between ">
+            <div className="flex items-center gap-4">
+              <div className="p-2 rounded-lg bg-sky-50 border border-sky-100">
+                <ScrollText size={20} className="text-sky-500" />
+              </div>
+              <span className="font-black text-slate-600 tracking-wide">{t('activity.title')}</span>
+            </div>
+            <ChevronRight size={18} className="text-slate-300" aria-hidden="true" />
+          </PaperPiece>
+        </button>
+
         <button type="button" onClick={() => setShowChangePassword(true)} className="w-full text-left active:scale-95 transition-transform">
           <PaperPiece color="white" rotate="-0.8deg" className="p-4 flex items-center justify-between ">
             <div className="flex items-center gap-4">
@@ -185,6 +213,21 @@ export default function Profile() {
           )
         })}
 
+        <button type="button" onClick={() => navigate('/clock-style')} className="w-full text-left active:scale-95 transition-transform">
+          <PaperPiece color="white" rotate="-0.6deg" className="p-4 flex items-center justify-between ">
+            <div className="flex items-center gap-4">
+              <div className="w-9 h-9 rounded-lg bg-sky-50 border border-sky-100 overflow-hidden flex items-center justify-center">
+                <img src={clockStyle.preview} alt="" draggable={false} className="w-full h-full object-contain" />
+              </div>
+              <span className="font-black text-slate-600 tracking-wide">{t('clockStyle.title')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-zh text-xs text-slate-500">{t(clockStyle.labelKey)}</span>
+              <ChevronRight size={18} className="text-slate-300" aria-hidden="true" />
+            </div>
+          </PaperPiece>
+        </button>
+
         <div className="flex items-center justify-between px-1 pt-2">
           <span className="font-black text-slate-500 text-[11px] uppercase tracking-widest">{t('common.language')}</span>
           <LanguageSwitcher />
@@ -192,7 +235,7 @@ export default function Profile() {
 
         <button
           type="button"
-          onClick={() => { logout(); navigate('/login') }}
+          onClick={handleLogout}
           className="w-full text-center mt-6 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-red-500 transition-colors"
         >
           {t('profile.logout')}
@@ -200,6 +243,12 @@ export default function Profile() {
       </div>
 
       <ChangePasswordModal open={showChangePassword} onClose={() => setShowChangePassword(false)} />
+      <LogoutConfirmModal
+        open={pendingPunches !== null}
+        entries={pendingPunches ?? []}
+        onCancel={() => setPendingPunches(null)}
+        onConfirm={() => { setPendingPunches(null); logout(); navigate('/login') }}
+      />
     </main>
   )
 }

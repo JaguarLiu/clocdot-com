@@ -14,6 +14,8 @@ const LeaveRequest = lazy(() => import('./pages/LeaveRequest.jsx'))
 const Overtime = lazy(() => import('./pages/Overtime.jsx'))
 const Payslip = lazy(() => import('./pages/Payslip.jsx'))
 const Approvals = lazy(() => import('./pages/Approvals.jsx'))
+const ClockStyle = lazy(() => import('./pages/ClockStyle.jsx'))
+const Activity = lazy(() => import('./pages/Activity.jsx'))
 
 function Loading() {
   const { t } = useTranslation()
@@ -52,7 +54,9 @@ export default function App() {
           <Route path="overtime" element={<Overtime />} />
           <Route path="payslip" element={<Payslip />} />
           <Route path="approvals" element={<Approvals />} />
+          <Route path="activity" element={<Activity />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="clock-style" element={<ClockStyle />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -7,6 +7,7 @@ import { canRequestCancel } from '../services/leaveTransitions.js'
 import { findOverlaps } from '../services/leaveOverlap.js'
 import { toCalendarEvents } from '../services/leaveCalendarView.js'
 import { createApprovalChain } from '../services/approvalEngine.js'
+import { auditContext, writeAudit } from '../services/audit.js'
 import { body, str, strOrNull } from '../utils/schema.js'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -85,21 +86,30 @@ export default async function leaveRoutes(fastify) {
       }
     }
 
-    const leave = await fastify.prisma.leaveRequest.create({
-      data: {
-        userId: request.user.id,
-        leaveType,
-        startDate: s,
-        startTime,
-        endDate: e,
-        endTime,
-        reason: reason || null,
-        status: 'pending',
-      },
-    })
-
-    await createApprovalChain(fastify.prisma, {
-      requestType: 'leave', requestId: leave.id, submitterId: user.id, companyId: user.companyId,
+    // 建單 + 建簽核鏈 + 稽核同一個 transaction：不會留下沒有簽核鏈的孤兒申請
+    const leave = await fastify.prisma.$transaction(async (tx) => {
+      const created = await tx.leaveRequest.create({
+        data: {
+          userId: request.user.id,
+          leaveType,
+          startDate: s,
+          startTime,
+          endDate: e,
+          endTime,
+          reason: reason || null,
+          status: 'pending',
+        },
+      })
+      const chain = await createApprovalChain(tx, {
+        requestType: 'leave', requestId: created.id, submitterId: user.id, companyId: user.companyId,
+      })
+      await writeAudit(tx, auditContext(request), {
+        action: 'leave.submitted', entityType: 'leave', entityId: created.id,
+        targetUserId: user.id, companyId: user.companyId,
+        after: { leaveType, startDate, startTime, endDate, endTime, reason: created.reason },
+        meta: { approvalLevels: chain.length },
+      })
+      return created
     })
 
     // 撞期偵測（非阻擋）：同公司其他人在此區間已核准的假
@@ -152,12 +162,22 @@ export default async function leaveRoutes(fastify) {
   fastify.delete('/api/leave-requests/:id', async (request, reply) => {
     const { id } = request.params
 
-    const existing = await fastify.prisma.leaveRequest.findUnique({ where: { id } })
+    const existing = await fastify.prisma.leaveRequest.findUnique({
+      where: { id }, include: { user: { select: { companyId: true } } },
+    })
     if (!existing) return reply.code(404).send({ error: '找不到該申請' })
     if (existing.userId !== request.user.id) return reply.code(403).send({ error: '無權撤回此申請' })
     if (existing.status !== 'pending') return reply.code(400).send({ error: '已審核的申請無法撤回' })
 
-    await fastify.prisma.leaveRequest.delete({ where: { id } })
+    // 申請列被刪除，稽核紀錄保留申請內容快照
+    const { user: owner, ...snapshot } = existing
+    await fastify.prisma.$transaction([
+      fastify.prisma.leaveRequest.delete({ where: { id } }),
+      writeAudit(fastify.prisma, auditContext(request), {
+        action: 'leave.withdrawn', entityType: 'leave', entityId: id,
+        targetUserId: existing.userId, companyId: owner?.companyId ?? undefined, before: snapshot,
+      }),
+    ])
     return { success: true }
   })
 
@@ -168,21 +188,31 @@ export default async function leaveRoutes(fastify) {
     const { id } = request.params
     const { cancelReason } = request.body ?? {}
 
-    const existing = await fastify.prisma.leaveRequest.findUnique({ where: { id } })
+    const existing = await fastify.prisma.leaveRequest.findUnique({
+      where: { id }, include: { user: { select: { companyId: true } } },
+    })
     if (!existing) return reply.code(404).send({ error: '找不到該申請' })
     if (existing.userId !== request.user.id) return reply.code(403).send({ error: '無權操作此申請' })
     if (!canRequestCancel(existing)) {
       return reply.code(400).send({ error: '此申請目前無法申請取消' })
     }
 
-    return fastify.prisma.leaveRequest.update({
-      where: { id },
-      data: {
-        cancelRequested: true,
-        cancelReason: cancelReason || null,
-        cancelRequestedAt: new Date(),
-      },
-    })
+    const [updated] = await fastify.prisma.$transaction([
+      fastify.prisma.leaveRequest.update({
+        where: { id },
+        data: {
+          cancelRequested: true,
+          cancelReason: cancelReason || null,
+          cancelRequestedAt: new Date(),
+        },
+      }),
+      writeAudit(fastify.prisma, auditContext(request), {
+        action: 'leave.cancel_requested', entityType: 'leave', entityId: id,
+        targetUserId: existing.userId, companyId: existing.user?.companyId ?? undefined,
+        meta: { cancelReason: cancelReason || null },
+      }),
+    ])
+    return updated
   })
 
   // GET /api/leave-calendar?from=YYYY-MM-DD&to=YYYY-MM-DD — 員工視角團隊行事曆（不含假別/理由）

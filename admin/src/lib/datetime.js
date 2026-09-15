@@ -44,3 +44,11 @@ export function formatList(items, lang) {
     return list.join(', ')
   }
 }
+
+/** 「2026/09/15 14:03:22」／「09/15/2026, 14:03:22」 */
+export function formatDateTime(date, lang) {
+  return date.toLocaleString(currentLang(lang), {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  })
+}

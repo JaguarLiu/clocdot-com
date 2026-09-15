@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { toUserDto } from '../utils/user.js'
 import { shouldLock, remainingLockMs, remainingAttempts, lockDurationMs } from '../services/loginLockout.js'
+import { auditContext, writeAudit } from '../services/audit.js'
 import { body, str } from '../utils/schema.js'
 
 const GENERIC_AUTH_ERROR = '帳號或密碼錯誤'
@@ -30,9 +31,16 @@ export default async function authRoutes(fastify) {
       return reply.code(401).send({ error: GENERIC_AUTH_ERROR })
     }
 
+    // 登入者尚未驗證身分 → actorId 為 null，受影響帳號記在 targetUserId
+    const loginAudit = (meta, actorId = null) => writeAudit(fastify.prisma, auditContext(request), {
+      action: actorId ? 'auth.login_succeeded' : 'auth.login_failed', entityType: 'user', entityId: user.id,
+      targetUserId: user.id, companyId: user.companyId ?? undefined, actorId, meta,
+    })
+
     // 時間性鎖定：期滿自動放行（計數不歸零，再錯會鎖更久一輪）
     const lockMs = remainingLockMs(user)
     if (lockMs > 0) {
+      await loginAudit({ reason: 'locked' })
       const waitMin = Math.ceil(lockMs / 60000)
       return reply.code(423).send({
         error: `密碼錯誤次數過多，帳號暫時鎖定，請於 ${waitMin} 分鐘後再試`,
@@ -44,13 +52,16 @@ export default async function authRoutes(fastify) {
     if (!ok) {
       const nextCount = user.failedLoginCount + 1
       const lockNow = shouldLock(nextCount)
-      await fastify.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          failedLoginCount: nextCount,
-          ...(lockNow ? { lockedAt: new Date() } : {}),
-        },
-      })
+      await fastify.prisma.$transaction([
+        fastify.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            failedLoginCount: nextCount,
+            ...(lockNow ? { lockedAt: new Date() } : {}),
+          },
+        }),
+        loginAudit({ reason: 'bad_password', failedLoginCount: nextCount, lockedNow: lockNow }),
+      ])
       if (lockNow) {
         const waitMin = Math.ceil(lockDurationMs(nextCount) / 60000)
         return reply.code(423).send({
@@ -72,6 +83,8 @@ export default async function authRoutes(fastify) {
         data: { failedLoginCount: 0, lockedAt: null },
       })
     }
+
+    await loginAudit(null, user.id)
 
     const token = fastify.jwt.sign({
       id: user.id,
@@ -115,10 +128,16 @@ export default async function authRoutes(fastify) {
     }
 
     const hashed = await bcrypt.hash(newPassword, 12)
-    await fastify.prisma.user.update({
-      where: { id: user.id },
-      data: { password: hashed },
-    })
+    await fastify.prisma.$transaction([
+      fastify.prisma.user.update({
+        where: { id: user.id },
+        data: { password: hashed },
+      }),
+      writeAudit(fastify.prisma, auditContext(request), {
+        action: 'auth.password_changed', entityType: 'user', entityId: user.id,
+        targetUserId: user.id, companyId: user.companyId ?? undefined,
+      }),
+    ])
 
     return { ok: true }
   })

@@ -16,6 +16,7 @@
 | 出勤 | 上下班時間、遲到早退分鐘、異常旗標、補卡申請與理由 | 每日出勤 |
 | 請假／加班 | 假別、起訖、時數、事由、簽核歷程與簽核者 | 申請與簽核 |
 | **薪資** | 月薪／時薪、津貼、投保薪資、自願提繳率、銀行帳號、每月薪資明細 | 薪資設定與月結 |
+| **稽核紀錄** | 操作者、對象員工、動作、變更前後欄位（銀行帳號只留末四碼）、來源 IP、User-Agent；登入失敗時記錄原因與失敗次數（僅限存在的帳號） | 寫入資料的操作（打卡、申請、簽核、員工／組織／薪資／排班異動）與登入成功／失敗 |
 
 粗體者屬敏感度較高的資料，尤其位置、IP 與薪資。
 
@@ -34,17 +35,18 @@
 | 儲存位置 | key | 內容 | 清除時機 |
 |---|---|---|---|
 | `localStorage` | `auth_token` | JWT | 登出時移除 |
-| `localStorage` | `clocdot.offlineQueue.v1` | **離線打卡佇列**（含座標） | 補送成功、或被新紀錄擠掉 |
+| `localStorage` | `clocdot.offlineQueue.v1` | **離線打卡佇列**（含座標） | 補送成功、被新紀錄擠掉、或登出時 |
 | `localStorage` | `clocdot_lang` | 介面語言偏好 | 使用者清除瀏覽器資料 |
+| `localStorage` | `clocdot_clock_style` | 打卡鐘樣式偏好 | 使用者清除瀏覽器資料 |
 | `localStorage` | `clocdot:install-dismissed-at` | PWA 安裝提示關閉時間 | 使用者清除瀏覽器資料 |
 | Service Worker Cache | precache | 應用程式靜態資源（JS/CSS/圖片） | 版本更新或使用者清除 |
-| Service Worker Cache | `api-cache` | **視部署而定的 API 回應**，見下方說明 | 24 小時後過期或超過 50 筆 |
+| Service Worker Cache | `api-cache` | **視部署而定的 API 回應**，見下方說明 | 2 小時後過期、超過 50 筆或登出時 |
 
 **離線打卡佇列**在裝置離線時會把打卡動作（含當下座標）暫存於 `localStorage`，最多保留 5 筆最新紀錄，待恢復連線後補送。這代表：
 
 - 未送出的座標會**明文留在裝置上**，直到補送成功或被新紀錄擠掉。
 - 送出成功或收到 4xx（無法重試）後會從佇列移除；網路或 5xx 錯誤則保留待下次重試。
-- 使用共用裝置時，**登出並不會自動清空尚未送出的佇列**，請在部署說明中提醒員工。
+- 登出時會一併清空佇列（佇列裡的打卡屬於目前使用者，不能留給下一位登入者）；若仍有未送出的打卡，會先跳出確認，員工選擇仍要登出時這些打卡會被丟棄，需改走補卡流程。
 
 ### PWA 更新與快取失效
 
@@ -58,12 +60,12 @@
 ```js
 urlPattern: /^https:\/\/api\..*/i,   // 主機名以 api. 開頭的請求
 handler: 'NetworkFirst',
-options: { cacheName: 'api-cache', expiration: { maxEntries: 50, maxAgeSeconds: 86400 } }
+options: { cacheName: 'api-cache', expiration: { maxEntries: 50, maxAgeSeconds: 7200 } }
 ```
 
 - **預設部署（`VITE_API_BASE=/api`，同網域路徑）不會命中此規則**，API 回應不進快取。
 - **但若你把 API 部署在 `api.example.com` 這類主機名下**，出勤、請假、薪資單等回應會被
-  Service Worker 快取在使用者裝置上**最多 24 小時、最多 50 筆**，且登出不會清除。
+  Service Worker 快取在使用者裝置上**最多 2 小時、最多 50 筆**；登出時會刪除 `api-cache`，但在登出前的這段期間仍會留在裝置上。
 
 若採用獨立 API 主機名，強烈建議移除或收斂這條規則（例如排除 `/api/payroll`、
 `/api/attendance`），否則敏感資料會殘留在共用裝置的瀏覽器快取中。
@@ -74,11 +76,13 @@ options: { cacheName: 'api-cache', expiration: { maxEntries: 50, maxAgeSeconds: 
 
 ## 四、保存與刪除
 
-**系統目前沒有內建的資料保存期限或自動刪除機制。** 出勤、請假、加班與薪資紀錄會無限期保留，直到你自行刪除。
+**除稽核紀錄外，系統目前沒有內建的資料保存期限或自動刪除機制。** 出勤、請假、加班與薪資紀錄會無限期保留，直到你自行刪除。
+
+稽核紀錄（`audit_logs`）每日依 `AUDIT_LOG_RETENTION_DAYS` 清理，預設保存 1825 天（5 年），最短 365 天；設 `AUDIT_LOG_RETENTION_DISABLED=true` 可停用。稽核紀錄刻意不設外鍵，**員工資料刪除後其稽核紀錄仍會保留**，行使刪除權時需一併處理。
 
 員工「停用」是 **soft delete**（設定 `deletedAt`），使用者列與其歷史紀錄仍留在資料庫中——這通常是薪資與勞動法遵所需，但**不等於行使刪除權**。
 
-若需要實際刪除或匿名化特定個人的資料，目前必須直接對資料庫操作。相關資料表包含 `users`、`attendance_records`、`correction_requests`、`leave_requests`、`overtime_requests`、`approval_steps`、`salary_profiles`、`payroll_items`、`issues`。請注意刪除已結算的薪資資料可能與稅務或勞動法規的保存義務衝突。
+若需要實際刪除或匿名化特定個人的資料，目前必須直接對資料庫操作。相關資料表包含 `users`、`attendance_records`、`correction_requests`、`leave_requests`、`overtime_requests`、`approval_steps`、`salary_profiles`、`payroll_items`、`issues`、`audit_logs`（以 `actor_id` / `target_user_id` 關聯）。請注意刪除已結算的薪資資料可能與稅務或勞動法規的保存義務衝突。
 
 **部署前建議先決定：** 保存期限、誰可以匯出薪資報表、備份的保存與加密方式、以及收到員工查詢或刪除請求時的處理流程。
 
@@ -101,6 +105,6 @@ options: { cacheName: 'api-cache', expiration: { maxEntries: 50, maxAgeSeconds: 
 - [ ] 訂定各類資料的保存期限與刪除流程
 - [ ] 限制可存取薪資模組的角色，並定期複核權限
 - [ ] 為資料庫備份設定加密與存取控制，並演練還原
-- [ ] 建立稽核與監控機制（本系統目前未內建稽核日誌）
+- [ ] 決定稽核紀錄保存天數（`AUDIT_LOG_RETENTION_DAYS`），並限制可存取稽核紀錄模組的角色；系統不記錄「查看／匯出」，如有需要請另建監控機制
 - [ ] 於共用裝置的使用說明中提醒離線佇列的行為
 - [ ] 正確設定 `TRUST_PROXY`，確保記錄的 IP 正確

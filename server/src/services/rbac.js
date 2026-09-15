@@ -2,7 +2,7 @@
 
 // 可授權給角色的模組
 export const GRANTABLE_MODULES = [
-  'monthly-report', 'corrections', 'leaves', 'overtime-reviews', 'employees', 'payroll', 'schedule',
+  'monthly-report', 'corrections', 'leaves', 'overtime-reviews', 'employees', 'payroll', 'schedule', 'audit-log',
 ]
 
 // 全部模組 key（含特例）

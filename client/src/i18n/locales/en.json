@@ -50,7 +50,9 @@
     "leaveTitle": "Leave Request",
     "overtimeTitle": "Overtime Request",
     "payslipTitle": "Payslip",
-    "profileTitle": "Profile"
+    "profileTitle": "Profile",
+    "clockStyleTitle": "Clock Style",
+    "activityTitle": "My Activity"
   },
   "login": {
     "logoAlt": "Company logo",
@@ -254,6 +256,20 @@
     "notificationSettings": "Notification settings",
     "logout": "Logout Account"
   },
+  "clockStyle": {
+    "title": "Clock style",
+    "classic": "Classic punch clock",
+    "puppy": "Shiro the puppy",
+    "allStyles": "All styles",
+    "allStylesEn": ""
+  },
+  "logoutConfirm": {
+    "title": "Punches still waiting",
+    "titleEn": "",
+    "body": "You have {{count}} offline punch(es) that have not reached the server yet. Logging out now clears them, and getting them back means filing a correction request. Go back to the punch page once you are online and they will be sent automatically.",
+    "stay": "Stay and let them sync",
+    "discard": "Log out anyway (discard them)"
+  },
   "password": {
     "title": "Change Password",
     "titleEn": "",
@@ -290,5 +306,86 @@
     "timeout": "Location timed out — the signal may be weak. Move near a window and retry.",
     "unsupported": "This device doesn't support location.",
     "generic": "Couldn't get your location."
+  },
+  "progress": {
+    "show": "View progress",
+    "hide": "Hide progress",
+    "loadFailed": "Couldn't load progress. Try again in a bit.",
+    "stepsTitle": "Approval steps",
+    "stepsCode": "",
+    "timelineTitle": "Timeline",
+    "timelineCode": "",
+    "noSteps": "No approval steps recorded for this request",
+    "noEvents": "No timeline entries yet",
+    "level": "Step {{level}}",
+    "noApprover": "No approver assigned",
+    "tone": {
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "skipped": "Decided by admin",
+      "current": "In review",
+      "waiting": "Waiting"
+    },
+    "byAdmin": "Admin",
+    "actor": "By {{name}}",
+    "action": {
+      "leave_submitted": "Leave request submitted",
+      "leave_withdrawn": "Request withdrawn",
+      "leave_cancel_requested": "Cancellation requested",
+      "leave_cancel_confirmed": "Cancellation approved",
+      "leave_cancel_rejected": "Cancellation declined; leave stays approved",
+      "leave_approved": "Leave approved",
+      "leave_rejected": "Leave rejected",
+      "correction_submitted": "Correction submitted",
+      "correction_approved": "Correction approved",
+      "correction_rejected": "Correction rejected",
+      "overtime_submitted": "Overtime submitted",
+      "overtime_resubmitted": "Overtime resubmitted",
+      "overtime_approved": "Overtime approved",
+      "overtime_rejected": "Overtime rejected",
+      "approval_step_approved": "Step {{level}} approved",
+      "approval_step_rejected": "Step {{level}} rejected",
+      "unknown": "Request updated"
+    }
+  },
+  "activity": {
+    "title": "My Activity",
+    "filterAria": "Activity category",
+    "loadFailed": "Couldn't load your activity. Try again in a bit.",
+    "empty": "Nothing here yet. Clock in and it'll start filling up.",
+    "loadMore": "Show older activity",
+    "end": "That's the earliest activity",
+    "filter": {
+      "all": "All",
+      "attendance": "Clock-ins",
+      "request": "Requests",
+      "account": "Account"
+    },
+    "offline": "Sent after offline",
+    "replacedPunchOut": "Updated clock-out (was {{time}})",
+    "byOthers": "Handled by {{name}}",
+    "viewRequest": "View request",
+    "yes": "Yes",
+    "no": "No",
+    "field": {
+      "punchIn": "Clock-in",
+      "punchOut": "Clock-out",
+      "workDuration": "Hours",
+      "isLate": "Late",
+      "isEarlyLeave": "Left early",
+      "leaveType": "Leave type",
+      "isHoliday": "Holiday"
+    },
+    "action": {
+      "attendance_punched_in": "Clocked in",
+      "attendance_punched_out": "Clocked out",
+      "attendance_corrected": "Correction approved, attendance updated",
+      "attendance_edited": "Attendance adjusted",
+      "auth_password_changed": "You changed your password",
+      "user_password_reset": "An admin reset your password",
+      "user_unlocked": "Account unlocked",
+      "unknown": "New activity"
+    },
+    "fieldLabel": "{{field}}: "
   }
 }

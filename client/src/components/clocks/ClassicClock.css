@@ -1,0 +1,43 @@
+/* Scoped to the attendance clock; animation never triggers or completes a request. */
+.punch-clock-machine { --punch-ink: #111710; --punch-paper: #faf5e9; --punch-teal: #2aafbc; }
+.punch-clock-machine { display: block; position: relative; isolation: isolate; width: min(81%, 340.2px); aspect-ratio: 1; padding: 0; margin: 0 auto; border: 0; background: transparent; color: var(--punch-ink); cursor: pointer; -webkit-tap-highlight-color: transparent; font: inherit; container-type: inline-size; }
+.punch-clock-machine { transform: scaleX(.95); }
+.punch-clock-machine:focus-visible { outline: 3px dashed #177783; outline-offset: 8px; border-radius: 24px; }
+.punch-clock-ground { position: absolute; left: 13%; right: 7%; bottom: 2%; height: 5%; background: #42391a20; border-radius: 50%; filter: blur(6px); z-index: -1; }
+.punch-clock-housing { position: absolute; inset: 0; }
+.punch-clock-back { position: absolute; inset: 26% 5% 4% 10%; background: var(--punch-ink); clip-path: polygon(17% 0, 90% 0, 96% 4%, 100% 86%, 88% 99%, 4% 99%, 0 92%, 4% 15%); border-radius: 11%; }
+.punch-clock-side { position: absolute; inset: 29% 7.5% 7% 73%; background: #249faa; clip-path: polygon(0 10%, 84% 0, 100% 86%, 52% 100%); }
+.punch-clock-top { position: absolute; left: 14%; top: 28%; width: 74%; height: 10%; background: #30b3bf; clip-path: polygon(13% 0, 96% 0, 100% 18%, 88% 100%, 0 88%); }
+.punch-clock-slot { position: absolute; z-index: 1; top: 29.8%; left: 31%; width: 45%; height: 3.5%; border-radius: 50% / 90%; background: var(--punch-ink); transform: skewX(-28deg); }
+/* Clip the card exactly at the insertion slot, so it disappears into the machine. */
+.punch-clock-card-window { position: absolute; z-index: 2; inset: 0 0 67.5%; overflow: hidden; }
+.punch-clock-card { position: absolute; left: 36%; top: 15%; width: 33%; height: 125%; padding: 9% 4% 0; background: var(--punch-paper); border: 1.6cqw solid var(--punch-ink); border-radius: 2% 3% 0 0; transform: rotate(4deg); transform-origin: center bottom; transition: transform .7s cubic-bezier(.45, 0, .25, 1); box-shadow: inset 0 0 20px #b2a78915; }
+.punch-clock-card-title { display: block; font-size: 2.4cqw; font-weight: 900; letter-spacing: .15em; border-bottom: 1px solid #bcbbae; padding-bottom: 7%; }
+.punch-clock-card-id { display: block; margin: 6% 0; font: 700 2cqw ui-monospace, monospace; overflow-wrap: anywhere; color: #7a8175; }
+.punch-clock-card-lines { height: 38%; background: repeating-linear-gradient(to bottom, transparent 0 23%, #c9cbbf 24% 26%); }
+.punch-clock-stamp { position: absolute; top: 51%; left: 12%; right: 12%; border: .7cqw solid #dc5542; color: #dc5542; padding: 3% 0; font-size: 2.6cqw; font-weight: 900; transform: rotate(-12deg); opacity: 1; background: var(--punch-paper); }
+.punch-clock-front { position: absolute; z-index: 3; left: 11%; top: 34%; width: 76%; height: 62%; border: 2cqw solid var(--punch-ink); border-radius: 10% 11% 8% 8% / 10% 11% 6% 6%; background: var(--punch-teal); transform: perspective(800px) rotateX(5deg); box-shadow: inset 1.1cqw .8cqw #87d9d3, inset -1.2cqw 0 #16818d; }
+.punch-clock-vents { position: absolute; top: 3%; left: 6%; width: 15%; display: grid; gap: 1cqw; }
+.punch-clock-vents i { display: block; height: 1.1cqw; border-radius: 10px; background: var(--punch-ink); }
+.punch-clock-display { position: absolute; left: 7%; right: 7%; top: 17%; height: 61%; border: 1.9cqw solid var(--punch-ink); border-radius: 13% / 20%; background: var(--punch-paper); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: inset 0 2px 8px #b9aa8820; }
+.punch-clock-time { display: flex; align-items: baseline; gap: 1.4cqw; font: 900 12.2cqw ui-monospace, "Courier New", monospace; letter-spacing: -.07em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.punch-clock-seconds { font-size: 5cqw; letter-spacing: -.03em; color: #859084; }
+.punch-clock-action { margin-top: 1.7cqw; font-size: 3.7cqw; font-weight: 900; letter-spacing: .17em; text-transform: uppercase; }
+.punch-clock-date { margin-top: 1.6cqw; font-size: 2.6cqw; font-weight: 700; letter-spacing: .04em; color: #687366; }
+.punch-clock-red-button { position: absolute; bottom: 5%; left: 37%; width: 25%; height: 12%; border: 1.5cqw solid var(--punch-ink); border-radius: 12% / 25%; background: #ef5b45; display: grid; align-content: center; gap: .8cqw; padding: 0 1.5cqw; box-shadow: 0 .6cqw var(--punch-ink); }
+.punch-clock-red-button::before, .punch-clock-red-button::after { content: ""; height: .7cqw; border-radius: 8px; background: var(--punch-ink); }
+
+.punch-clock-machine:disabled { cursor: wait; }
+.punch-clock-card-lines { display: block; }
+.punch-clock-machine[aria-busy="true"] .punch-clock-card { transform: translateY(76%) rotate(0); }
+.punch-clock-machine[aria-busy="true"] .punch-clock-red-button { transform: translateY(12%); box-shadow: none; }
+.punch-clock-machine[aria-busy="true"] .punch-clock-housing { animation: punch-clock-bump .4s .7s ease; }
+.punch-clock-machine[aria-busy="true"] .punch-clock-display { animation: punch-clock-reading 1.2s ease-in-out infinite; }
+.punch-clock-action { text-align: center; }
+@keyframes punch-clock-bump { 0%, 100% { transform: translateY(0); } 25%, 75% { transform: translateY(1%); } 50% { transform: translateY(-.5%); } }
+@keyframes punch-clock-reading { 50% { background: #e7eada; } }
+@media (prefers-reduced-motion: reduce) {
+  .punch-clock-card { transition: none; }
+  .punch-clock-machine[aria-busy="true"] .punch-clock-housing,
+  .punch-clock-machine[aria-busy="true"] .punch-clock-display { animation: none; }
+}

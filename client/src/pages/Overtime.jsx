@@ -7,6 +7,7 @@ import PaperPiece from '../components/PaperPiece.jsx'
 import PaperToast from '../components/PaperToast.jsx'
 import MarkerButton from '../components/MarkerButton.jsx'
 import StatusStamp from '../components/StatusStamp.jsx'
+import RequestProgress from '../components/RequestProgress.jsx'
 import { getOvertimePending, submitOvertimeRequest, getMyOvertimeCompliance, fetcher } from '../services/api.js'
 
 const LIST_ROTATIONS = ['-0.6deg', '0.5deg', '-0.4deg', '0.7deg', '-0.3deg']
@@ -297,6 +298,8 @@ function OvertimeHistory() {
                   <StatusStamp status={req.status} />
                 </div>
               </div>
+
+              <RequestProgress type="overtime" id={req.id} />
             </PaperPiece>
           ))}
         </div>

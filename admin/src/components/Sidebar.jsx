@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FileSpreadsheet, CheckCircle2, CalendarCheck, Building2, Users, LogOut, User, KeyRound, MessageSquareWarning, Timer, Wallet, CalendarDays, X } from 'lucide-react'
+import { LayoutDashboard, FileSpreadsheet, CheckCircle2, CalendarCheck, Building2, Users, LogOut, User, KeyRound, MessageSquareWarning, Timer, Wallet, CalendarDays, ScrollText, X } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth.js'
 import ChangePasswordModal from './ChangePasswordModal.jsx'
 import IssueReportModal from './IssueReportModal.jsx'
@@ -17,6 +17,7 @@ const navItems = [
   { path: '/employees', icon: Users, labelKey: 'nav.employees', accent: 'emerald', module: 'employees' },
   { path: '/schedule', icon: CalendarDays, labelKey: 'nav.schedule', accent: 'emerald', module: 'schedule' },
   { path: '/payroll', icon: Wallet, labelKey: 'nav.payroll', accent: 'emerald', module: 'payroll' },
+  { path: '/audit-log', icon: ScrollText, labelKey: 'nav.auditLog', accent: 'sky', module: 'audit-log' },
   { path: '/settings', icon: Building2, labelKey: 'nav.settings', accent: 'sky', module: 'settings' },
 ]
 

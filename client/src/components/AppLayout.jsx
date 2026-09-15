@@ -11,7 +11,9 @@ const HEADER_TITLE_KEYS = {
   '/leave': 'nav.leaveTitle',
   '/overtime': 'nav.overtimeTitle',
   '/payslip': 'nav.payslipTitle',
+  '/activity': 'nav.activityTitle',
   '/profile': 'nav.profileTitle',
+  '/clock-style': 'nav.clockStyleTitle',
 }
 
 export default function AppLayout() {

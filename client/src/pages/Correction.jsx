@@ -7,6 +7,7 @@ import PaperPiece from '../components/PaperPiece.jsx'
 import PaperToast from '../components/PaperToast.jsx'
 import MarkerButton from '../components/MarkerButton.jsx'
 import StatusStamp from '../components/StatusStamp.jsx'
+import RequestProgress from '../components/RequestProgress.jsx'
 import { submitCorrectionRequest, fetcher } from '../services/api.js'
 import { formatYearMonth } from '../utils/time.js'
 import { parseCorrectionReason, STORED_TYPE_OUT } from '../utils/correctionReason.js'
@@ -350,6 +351,8 @@ function CorrectionCard({ req, rotate }) {
           <StatusStamp status={req.status} />
         </div>
       </div>
+
+      <RequestProgress type="correction" id={req.id} />
     </PaperPiece>
   )
 }

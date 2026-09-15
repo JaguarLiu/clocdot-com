@@ -2,6 +2,7 @@ import { geocodeAddress } from '../../utils/geocode.js'
 import { validateOnsiteSchedule } from '../../services/onsiteSchedule.js'
 import { isValidIpOrCidr } from '../../utils/ipMatch.js'
 import { assertOwnedByCompany } from '../../utils/tenant.js'
+import { auditContext, diffFields, writeAudit } from '../../services/audit.js'
 
 export function registerCompanyRoutes(fastify, S) {
 // GET /api/admin/company — 取得目前管理員所屬公司設定
@@ -121,7 +122,15 @@ fastify.patch('/api/admin/company', { preHandler: fastify.requireModule('setting
     }
   }
 
-  return fastify.prisma.company.update({ where: { id: request.companyId }, data })
+  const before = await fastify.prisma.company.findUnique({ where: { id: request.companyId } })
+  const change = diffFields(before, data)
+  const [updated] = await fastify.prisma.$transaction([
+    fastify.prisma.company.update({ where: { id: request.companyId }, data }),
+    ...(change ? [writeAudit(fastify.prisma, auditContext(request), {
+      action: 'company.updated', entityType: 'company', entityId: request.companyId, ...change,
+    })] : []),
+  ])
+  return updated
 })
 
 // GET /api/admin/my-ip — 給設定頁「使用我目前的 IP」按鈕
@@ -206,15 +215,22 @@ fastify.post('/api/admin/company-locations', { preHandler: fastify.requireModule
   // 不論成功失敗都 mark — Google API 已被打過，要避免重試風暴
   await markGeocodeUsed(request.companyId)
 
-  return fastify.prisma.companyLocation.create({
-    data: {
-      companyId: request.companyId,
-      name,
-      address,
-      lat,
-      lng,
-      ...(Number.isInteger(radius) ? { radius } : {}),
-    },
+  return fastify.prisma.$transaction(async (tx) => {
+    const created = await tx.companyLocation.create({
+      data: {
+        companyId: request.companyId,
+        name,
+        address,
+        lat,
+        lng,
+        ...(Number.isInteger(radius) ? { radius } : {}),
+      },
+    })
+    await writeAudit(tx, auditContext(request), {
+      action: 'company_location.created', entityType: 'company_location', entityId: created.id,
+      after: { name, address, lat, lng, radius: created.radius },
+    })
+    return created
   })
 })
 
@@ -249,7 +265,13 @@ fastify.patch('/api/admin/company-locations/:id', { preHandler: fastify.requireM
     }
   }
 
-  const updated = await fastify.prisma.companyLocation.update({ where: { id }, data })
+  const change = diffFields(existing, data)
+  const [updated] = await fastify.prisma.$transaction([
+    fastify.prisma.companyLocation.update({ where: { id }, data }),
+    ...(change ? [writeAudit(fastify.prisma, auditContext(request), {
+      action: 'company_location.updated', entityType: 'company_location', entityId: id, ...change,
+    })] : []),
+  ])
   // 每次編輯成功都 mark cache (不只 geocode 時)，下一次 30 分鐘內任何編輯都會被擋
   await markGeocodeUsed(request.companyId)
   return updated
@@ -265,7 +287,13 @@ fastify.delete('/api/admin/company-locations/:id', { preHandler: fastify.require
   )
   if (!existing) return
 
-  await fastify.prisma.companyLocation.delete({ where: { id } })
+  await fastify.prisma.$transaction([
+    fastify.prisma.companyLocation.delete({ where: { id } }),
+    writeAudit(fastify.prisma, auditContext(request), {
+      action: 'company_location.deleted', entityType: 'company_location', entityId: id,
+      before: { name: existing.name, address: existing.address, lat: existing.lat, lng: existing.lng, radius: existing.radius },
+    }),
+  ])
   return { ok: true }
 })
 }

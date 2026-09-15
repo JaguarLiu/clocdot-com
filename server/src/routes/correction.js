@@ -1,5 +1,6 @@
 import { dateStrToDate } from '../utils/timezone.js'
 import { createApprovalChain } from '../services/approvalEngine.js'
+import { auditContext, writeAudit } from '../services/audit.js'
 import { body, str } from '../utils/schema.js'
 
 export default async function correctionRoutes(fastify) {
@@ -31,18 +32,27 @@ export default async function correctionRoutes(fastify) {
       return reply.code(404).send({ error: '找不到該日期的考勤紀錄' })
     }
 
-    const correction = await fastify.prisma.correctionRequest.create({
-      data: {
-        attendanceId: attendance.id,
-        reason: `[${type === 'in' ? '上班' : '下班'}] ${time} - ${reason}`,
-      },
-    })
-
-    await createApprovalChain(fastify.prisma, {
-      requestType: 'correction',
-      requestId: correction.id,
-      submitterId: request.user.id,
-      companyId: attendance.user?.companyId ?? request.companyId,
+    const companyId = attendance.user?.companyId ?? request.companyId
+    const correction = await fastify.prisma.$transaction(async (tx) => {
+      const created = await tx.correctionRequest.create({
+        data: {
+          attendanceId: attendance.id,
+          reason: `[${type === 'in' ? '上班' : '下班'}] ${time} - ${reason}`,
+        },
+      })
+      const chain = await createApprovalChain(tx, {
+        requestType: 'correction',
+        requestId: created.id,
+        submitterId: request.user.id,
+        companyId,
+      })
+      await writeAudit(tx, auditContext(request), {
+        action: 'correction.submitted', entityType: 'correction', entityId: created.id,
+        targetUserId: request.user.id, companyId,
+        after: { workDate, type, time, reason },
+        meta: { attendanceId: attendance.id, approvalLevels: chain.length },
+      })
+      return created
     })
 
     return correction

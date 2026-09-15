@@ -5,6 +5,7 @@ import { resolveLocation } from '../utils/geofence.js'
 import { isOnsiteRequired } from '../services/onsiteSchedule.js'
 import { buildOnsiteCheck } from '../services/onsiteCheck.js'
 import { getShiftForDate, loadScheduleBundle, shiftFor, shouldFallbackToYesterday } from '../services/schedule.js'
+import { auditContext, diffFields, writeAudit } from '../services/audit.js'
 import { body } from '../utils/schema.js'
 
 // 打卡 body：座標數字（遠端可省略/null）、clientTime 為 ISO 字串
@@ -109,27 +110,36 @@ export default async function attendanceRoutes(fastify) {
       return reply.code(403).send({ error: check.message, code: check.code })
     }
 
-    const record = await fastify.prisma.attendanceRecord.upsert({
-      where: { userId_workDate: { userId: request.user.id, workDate: today } },
-      update: {
-        punchIn: now, isLate,
-        punchInLat: typeof lat === 'number' ? lat : null,
-        punchInLng: typeof lng === 'number' ? lng : null,
-        punchInLocationId: locationId,
-        punchInLocationType: locationType,
-        punchInIp: request.ip,
-      },
-      create: {
-        userId: request.user.id,
-        workDate: today,
-        punchIn: now,
-        isLate,
-        punchInLat: typeof lat === 'number' ? lat : null,
-        punchInLng: typeof lng === 'number' ? lng : null,
-        punchInLocationId: locationId,
-        punchInLocationType: locationType,
-        punchInIp: request.ip,
-      },
+    const record = await fastify.prisma.$transaction(async (tx) => {
+      const saved = await tx.attendanceRecord.upsert({
+        where: { userId_workDate: { userId: request.user.id, workDate: today } },
+        update: {
+          punchIn: now, isLate,
+          punchInLat: typeof lat === 'number' ? lat : null,
+          punchInLng: typeof lng === 'number' ? lng : null,
+          punchInLocationId: locationId,
+          punchInLocationType: locationType,
+          punchInIp: request.ip,
+        },
+        create: {
+          userId: request.user.id,
+          workDate: today,
+          punchIn: now,
+          isLate,
+          punchInLat: typeof lat === 'number' ? lat : null,
+          punchInLng: typeof lng === 'number' ? lng : null,
+          punchInLocationId: locationId,
+          punchInLocationType: locationType,
+          punchInIp: request.ip,
+        },
+      })
+      await writeAudit(tx, auditContext(request), {
+        action: 'attendance.punched_in', entityType: 'attendance', entityId: saved.id,
+        targetUserId: request.user.id, companyId: user?.companyId ?? undefined,
+        after: { punchIn: now, isLate, locationType },
+        meta: { workDate: today, offline: Boolean(resolved?.time), locationId },
+      })
+      return saved
     })
 
     return record
@@ -213,16 +223,27 @@ export default async function attendanceRoutes(fastify) {
       return reply.code(403).send({ error: check.message, code: check.code })
     }
 
-    const updated = await fastify.prisma.attendanceRecord.update({
-      where: { id: record.id },
-      data: {
-        punchOut, workDuration, isLate, isEarlyLeave,
-        punchOutLat: typeof lat === 'number' ? lat : null,
-        punchOutLng: typeof lng === 'number' ? lng : null,
-        punchOutLocationId: locationId,
-        punchOutLocationType: locationType,
-        punchOutIp: request.ip,
-      },
+    const updated = await fastify.prisma.$transaction(async (tx) => {
+      const saved = await tx.attendanceRecord.update({
+        where: { id: record.id },
+        data: {
+          punchOut, workDuration, isLate, isEarlyLeave,
+          punchOutLat: typeof lat === 'number' ? lat : null,
+          punchOutLng: typeof lng === 'number' ? lng : null,
+          punchOutLocationId: locationId,
+          punchOutLocationType: locationType,
+          punchOutIp: request.ip,
+        },
+      })
+      await writeAudit(tx, auditContext(request), {
+        action: 'attendance.punched_out', entityType: 'attendance', entityId: saved.id,
+        targetUserId: request.user.id, companyId: user?.companyId ?? undefined,
+        // 重複打下班卡會覆蓋前一次，before 保留被蓋掉的值
+        ...(diffFields(record, { punchOut, workDuration, isLate, isEarlyLeave })
+          ?? { after: { punchOut, workDuration, isLate, isEarlyLeave } }),
+        meta: { workDate, offline: Boolean(resolved?.time), locationType, locationId },
+      })
+      return saved
     })
 
     return updated

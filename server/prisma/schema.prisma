@@ -386,3 +386,28 @@ model ShiftAssignment {
   @@index([shiftId])
   @@map("shift_assignments")
 }
+
+// 稽核紀錄（append-only）。刻意不建 FK：被操作對象刪除/停用後紀錄仍需保留。
+// action 命名 `<entity>.<verb>`，清單與「員工可見」白名單見 services/audit.js。
+// 保存期限由 AUDIT_LOG_RETENTION_DAYS 控制，plugins/auditRetention.js 每日清理。
+model AuditLog {
+  id           String   @id @default(uuid())
+  companyId    String?  // 登入失敗等查無公司的事件為 null
+  actorId      String?  // 操作者；null = 系統
+  action       String
+  entityType   String   // 'leave' | 'correction' | 'overtime' | 'attendance' | 'user' | ...
+  entityId     String?
+  targetUserId String?  // 受影響的員工 — 員工端「我的紀錄」依此查詢
+  before       Json?    // 僅記有變動的欄位
+  after        Json?
+  meta         Json?
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([targetUserId, createdAt])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

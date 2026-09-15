@@ -7,6 +7,7 @@ import PaperPiece from '../components/PaperPiece.jsx'
 import PaperToast from '../components/PaperToast.jsx'
 import MarkerButton from '../components/MarkerButton.jsx'
 import StatusStamp from '../components/StatusStamp.jsx'
+import RequestProgress from '../components/RequestProgress.jsx'
 import { submitLeaveRequest, cancelLeaveRequest, requestLeaveCancellation, getLeaveCalendar, getHolidays, fetcher } from '../services/api.js'
 import { formatLeaveDuration, formatYearMonth, weekdayNarrowNames, formatList } from '../utils/time.js'
 import { leaveTypeOptions, leaveTypeLabel, leaveTypeCode } from '../utils/leaveTypes.js'
@@ -644,6 +645,8 @@ function LeaveCard({
           )}
         </div>
       )}
+
+      <RequestProgress type="leave" id={req.id} />
     </PaperPiece>
   )
 }

@@ -5,6 +5,7 @@ import { resolveDayType } from '../services/dayType.js'
 import { classifyOvertime } from '../services/overtime.js'
 import { evaluateOvertimeCompliance, MONTHLY_CAP_NORMAL } from '../services/compliance.js'
 import { createApprovalChain } from '../services/approvalEngine.js'
+import { auditContext, writeAudit } from '../services/audit.js'
 import { body, str, int, strOrNull } from '../utils/schema.js'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -106,30 +107,44 @@ export default async function overtimeRoutes(fastify) {
     }
 
     // upsert：首次送出建立 pending；rejected 後重送則更新原列為 pending
-    const ot = await fastify.prisma.overtimeRequest.upsert({
+    const previous = await fastify.prisma.overtimeRequest.findUnique({
       where: { userId_workDate: { userId: user.id, workDate: dateObj } },
-      update: {
-        derivedMinutes: totalOvertimeMinutes,
-        requestedMinutes,
-        dayType,
-        tiers,
-        reason: reason || null,
-        status: 'pending',
-      },
-      create: {
-        userId: user.id,
-        workDate: dateObj,
-        derivedMinutes: totalOvertimeMinutes,
-        requestedMinutes,
-        dayType,
-        tiers,
-        reason: reason || null,
-        status: 'pending',
-      },
+      select: { id: true, status: true, requestedMinutes: true, reason: true },
     })
+    const ot = await fastify.prisma.$transaction(async (tx) => {
+      const saved = await tx.overtimeRequest.upsert({
+        where: { userId_workDate: { userId: user.id, workDate: dateObj } },
+        update: {
+          derivedMinutes: totalOvertimeMinutes,
+          requestedMinutes,
+          dayType,
+          tiers,
+          reason: reason || null,
+          status: 'pending',
+        },
+        create: {
+          userId: user.id,
+          workDate: dateObj,
+          derivedMinutes: totalOvertimeMinutes,
+          requestedMinutes,
+          dayType,
+          tiers,
+          reason: reason || null,
+          status: 'pending',
+        },
+      })
 
-    await createApprovalChain(fastify.prisma, {
-      requestType: 'overtime', requestId: ot.id, submitterId: user.id, companyId: user.companyId,
+      const chain = await createApprovalChain(tx, {
+        requestType: 'overtime', requestId: saved.id, submitterId: user.id, companyId: user.companyId,
+      })
+      await writeAudit(tx, auditContext(request), {
+        action: 'overtime.submitted', entityType: 'overtime', entityId: saved.id,
+        targetUserId: user.id, companyId: user.companyId,
+        before: previous ? { status: previous.status, requestedMinutes: previous.requestedMinutes, reason: previous.reason } : null,
+        after: { workDate, requestedMinutes, derivedMinutes: totalOvertimeMinutes, dayType, reason: saved.reason },
+        meta: { resubmitted: Boolean(previous), approvalLevels: chain.length },
+      })
+      return saved
     })
     return ot
   })

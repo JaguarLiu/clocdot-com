@@ -1,4 +1,5 @@
 import { listPendingForUser, decideStepByApprover } from '../services/approvalEngine.js'
+import { auditContext } from '../services/audit.js'
 import { body, str, strOrNull, bool } from '../utils/schema.js'
 
 export default async function approvalRoutes(fastify) {
@@ -19,7 +20,7 @@ export default async function approvalRoutes(fastify) {
       return reply.code(400).send({ error: 'decision 必須為 approve 或 reject' })
     }
     const result = await decideStepByApprover(fastify.prisma, {
-      stepId, userId: request.user.id, decision, note, confirm,
+      stepId, userId: request.user.id, decision, note, confirm, audit: auditContext(request),
     })
     if (!result.ok) return reply.code(result.code).send(result.body)
     return result.body

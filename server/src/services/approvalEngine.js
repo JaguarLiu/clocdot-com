@@ -1,5 +1,6 @@
 import { computeChain, summarizeStatus } from './approvalChain.js'
 import { applyApprovalEffects } from './approvalEffects.js'
+import { writeAudit } from './audit.js'
 
 // 決議流程中止用：帶著結果丟出，讓 runInTx rollback 後把結果回給呼叫端
 class DecisionAbort extends Error {
@@ -36,6 +37,35 @@ async function setRequestRejected(prisma, { requestType, requestId, decidedById,
   return res.count > 0
 }
 
+// 申請的擁有者（受影響員工）與公司 — 稽核紀錄的 targetUserId / companyId
+export async function loadRequestOwner(prisma, requestType, requestId) {
+  if (requestType === 'leave' || requestType === 'overtime') {
+    const model = requestType === 'leave' ? prisma.leaveRequest : prisma.overtimeRequest
+    const r = await model.findUnique({
+      where: { id: requestId }, select: { userId: true, user: { select: { companyId: true } } },
+    })
+    return r ? { userId: r.userId, companyId: r.user?.companyId ?? null } : null
+  }
+  if (requestType === 'correction') {
+    const r = await prisma.correctionRequest.findUnique({
+      where: { id: requestId },
+      select: { attendance: { select: { userId: true, user: { select: { companyId: true } } } } },
+    })
+    return r?.attendance ? { userId: r.attendance.userId, companyId: r.attendance.user?.companyId ?? null } : null
+  }
+  return null
+}
+
+// 決議相關的稽核寫入；audit 為 null（未傳 ctx）時略過
+async function auditDecision(tx, audit, { requestType, requestId, action, meta }) {
+  if (!audit) return
+  const owner = await loadRequestOwner(tx, requestType, requestId)
+  await writeAudit(tx, audit, {
+    action, entityType: requestType, entityId: requestId,
+    targetUserId: owner?.userId ?? null, companyId: owner?.companyId ?? undefined, meta,
+  })
+}
+
 // 送單時建鏈（覆蓋舊鏈：先刪後建，支援加班 upsert 重送）
 export async function createApprovalChain(prisma, { requestType, requestId, submitterId, companyId }) {
   const company = await prisma.company.findUnique({ where: { id: companyId }, select: { approvalLevels: true } })
@@ -54,7 +84,8 @@ export async function createApprovalChain(prisma, { requestType, requestId, subm
 }
 
 // 員工/主管於員工端決議
-export async function decideStepByApprover(prisma, { stepId, userId, decision, note, confirm }) {
+// audit：auditContext(request)，不傳則不寫稽核紀錄
+export async function decideStepByApprover(prisma, { stepId, userId, decision, note, confirm, audit = null }) {
   return runInTx(prisma, async (tx) => {
     const step = await tx.approvalStep.findUnique({ where: { id: stepId } })
     if (!step) return { ok: false, code: 404, body: { error: '找不到簽核項目' } }
@@ -75,9 +106,17 @@ export async function decideStepByApprover(prisma, { stepId, userId, decision, n
     })
     if (claimed.count === 0) return { ok: false, code: 409, body: { error: '此項目已被處理' } }
 
+    const target = { requestType: step.requestType, requestId: step.requestId }
+    await auditDecision(tx, audit, {
+      ...target,
+      action: decision === 'reject' ? 'approval.step_rejected' : 'approval.step_approved',
+      meta: { stepId: step.id, level: step.level, note: note || null },
+    })
+
     if (decision === 'reject') {
       const marked = await setRequestRejected(tx, { requestType: step.requestType, requestId: step.requestId, decidedById: userId, note })
       if (!marked) throw new DecisionAbort({ ok: false, code: 409, body: { error: '此申請已審核' } })
+      await auditDecision(tx, audit, { ...target, action: `${step.requestType}.rejected`, meta: { level: step.level } })
       return { ok: true, body: { status: 'rejected' } }
     }
 
@@ -86,32 +125,44 @@ export async function decideStepByApprover(prisma, { stepId, userId, decision, n
     const summary = summarizeStatus(after)
     if (summary.status === 'approved') {
       const eff = await applyApprovalEffects(tx, {
-        requestType: step.requestType, requestId: step.requestId, decidedById: userId, note, confirm,
+        requestType: step.requestType, requestId: step.requestId, decidedById: userId, note, confirm, audit,
       })
       // 效果未成立（餘額不足 / 合規 409 需 confirm…）→ rollback，step 維持 pending
       if (!eff.ok) throw new DecisionAbort(eff)
+      await auditDecision(tx, audit, {
+        ...target, action: `${step.requestType}.approved`,
+        meta: { level: step.level, complianceOverride: confirm === true },
+      })
     }
     return { ok: true, body: summary.status === 'approved' ? { status: 'approved' } : { status: 'pending', activeLevel: summary.activeLevel } }
   })
 }
 
 // admin 越級：一鍵核准整筆 / 駁回（相容無 step 的舊申請）
-export async function adminFinalize(prisma, { requestType, requestId, decision, note, decidedById, confirm }) {
+export async function adminFinalize(prisma, { requestType, requestId, decision, note, decidedById, confirm, audit = null }) {
   return runInTx(prisma, async (tx) => {
     if (decision === 'reject') {
-      await tx.approvalStep.updateMany({
+      const rejectedSteps = await tx.approvalStep.updateMany({
         where: { requestType, requestId, status: 'pending' },
         data: { status: 'rejected', decidedAt: new Date(), decidedById },
       })
       const marked = await setRequestRejected(tx, { requestType, requestId, decidedById, note })
       if (!marked) throw new DecisionAbort({ ok: false, code: 400, body: { error: '此申請已審核' } })
+      await auditDecision(tx, audit, {
+        requestType, requestId, action: `${requestType}.rejected`,
+        meta: { byAdmin: true, note: note || null, closedSteps: rejectedSteps.count },
+      })
       return { ok: true, body: { status: 'rejected' } }
     }
-    const eff = await applyApprovalEffects(tx, { requestType, requestId, decidedById, note, confirm })
+    const eff = await applyApprovalEffects(tx, { requestType, requestId, decidedById, note, confirm, audit })
     if (!eff.ok) throw new DecisionAbort(eff)
-    await tx.approvalStep.updateMany({
+    const skipped = await tx.approvalStep.updateMany({
       where: { requestType, requestId, status: 'pending' },
       data: { status: 'skipped', decidedAt: new Date(), decidedById },
+    })
+    await auditDecision(tx, audit, {
+      requestType, requestId, action: `${requestType}.approved`,
+      meta: { byAdmin: true, note: note || null, skippedSteps: skipped.count, complianceOverride: confirm === true },
     })
     return { ok: true, body: { status: 'approved' } }
   })

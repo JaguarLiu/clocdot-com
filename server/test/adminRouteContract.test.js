@@ -56,6 +56,7 @@ const expectedRoutes = [
   ['POST', '/api/admin/users/:id/unlock', 'employees'],
   ['PUT', '/api/admin/users/:id/password', 'employees'],
   ['POST', '/api/admin/issues', null],
+  ['GET', '/api/admin/audit-logs', 'audit-log'],
 ]
 
 function captureAdminRoutes() {

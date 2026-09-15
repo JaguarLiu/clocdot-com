@@ -13,6 +13,7 @@ import { enqueuePunch, queueSize, replayQueue } from '../services/offlineQueue.j
 import { punchIn as apiPunchIn, punchOut as apiPunchOut, fetcher } from '../services/api.js'
 import { formatShiftRange } from '../utils/shiftTime.js'
 import { weekdayShortNamesMondayFirst } from '../utils/time.js'
+import { punchMood } from '../utils/punchMood.js'
 import useSWR from 'swr'
 
 function formatTime(dateStr) {
@@ -25,6 +26,8 @@ export default function Attendance() {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isPunching, setIsPunching] = useState(false)
   const [toast, setToast] = useState(null)
+  // 打卡成功後給打卡鐘的反應（小狗吃飯 / 生氣）；只在拿到 server 紀錄時才有，離線進佇列不判定
+  const [reaction, setReaction] = useState(null)
   const [pendingCount, setPendingCount] = useState(() => queueSize())
   const { todayRecord, isLoading, clockIn, clockOut, refresh } = useAttendance()
   const { onsiteRequired, wifiCheckinEnabled } = useTodayRequired()
@@ -158,12 +161,9 @@ export default function Attendance() {
         return
       }
 
+      let record
       try {
-        if (action === 'out') {
-          await clockOut({ lat, lng })
-        } else {
-          await clockIn({ lat, lng })
-        }
+        record = action === 'out' ? await clockOut({ lat, lng }) : await clockIn({ lat, lng })
       } catch (err) {
         // fetch throw NETWORK_ERROR (例如 Wi-Fi 假連線) → 退到 offline 路徑
         if (err?.isNetworkError && !onsiteRequired) {
@@ -179,6 +179,7 @@ export default function Attendance() {
         }
         throw err
       }
+      setReaction({ id: Date.now(), mood: punchMood(action, record) })
     } catch (err) {
       const msg = err?.info?.error || err?.info?.message || err?.message || t('attendance.errPunchFailed')
       setToast({ variant: 'error', message: msg })
@@ -246,6 +247,9 @@ export default function Attendance() {
           isPunching={isPunching}
           currentTime={currentTime}
           empNo={user?.empNo}
+          punchIn={todayRecord?.punchIn}
+          punchOut={todayRecord?.punchOut}
+          reaction={reaction}
           onClick={handleClockAction}
         />
       </section>

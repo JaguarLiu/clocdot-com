@@ -1,6 +1,7 @@
 import { validateShiftPayload } from '../services/schedule.js'
 import { evaluateScheduleCompliance, dayIndex } from '../services/scheduleCompliance.js'
 import { getTodayStart, dateStrToDate } from '../utils/timezone.js'
+import { auditContext, diffFields, writeAudit } from '../services/audit.js'
 import { body, str, int, bool, anyArray } from '../utils/schema.js'
 
 const shiftBodySchema = body({
@@ -72,13 +73,17 @@ export default async function shiftRoutes(fastify) {
     if (err) return reply.code(400).send({ error: err })
     try {
       return await fastify.prisma.$transaction(async (tx) => {
+        let previousDefault = null
         if (isDefault === true) {
+          previousDefault = await tx.shift.findFirst({
+            where: { companyId: request.companyId, isDefault: true }, select: { id: true, name: true },
+          })
           await tx.shift.updateMany({
             where: { companyId: request.companyId, isDefault: true },
             data: { isDefault: false },
           })
         }
-        return tx.shift.create({
+        const created = await tx.shift.create({
           data: {
             companyId: request.companyId,
             name: name.trim(), startTime, endTime, breakMinutes,
@@ -86,6 +91,12 @@ export default async function shiftRoutes(fastify) {
           },
           select: SHIFT_SELECT,
         })
+        await writeAudit(tx, auditContext(request), {
+          action: 'shift.created', entityType: 'shift', entityId: created.id,
+          after: { name: created.name, startTime, endTime, breakMinutes, isDefault: created.isDefault },
+          ...(previousDefault ? { meta: { previousDefaultShift: previousDefault.name } } : {}),
+        })
+        return created
       })
     } catch (e) {
       if (e?.code === 'P2002') return reply.code(409).send({ error: '班別名稱已存在' })
@@ -113,17 +124,26 @@ export default async function shiftRoutes(fastify) {
     }
     try {
       return await fastify.prisma.$transaction(async (tx) => {
+        let previousDefault = null
         if (isDefault === true && !existing.isDefault) {
+          previousDefault = await tx.shift.findFirst({
+            where: { companyId: request.companyId, isDefault: true }, select: { id: true, name: true },
+          })
           await tx.shift.updateMany({
             where: { companyId: request.companyId, isDefault: true },
             data: { isDefault: false },
           })
         }
-        return tx.shift.update({
-          where: { id },
-          data: { name: name.trim(), startTime, endTime, breakMinutes, isDefault: isDefault === true },
-          select: SHIFT_SELECT,
-        })
+        const data = { name: name.trim(), startTime, endTime, breakMinutes, isDefault: isDefault === true }
+        const updated = await tx.shift.update({ where: { id }, data, select: SHIFT_SELECT })
+        const change = diffFields(existing, data)
+        if (change) {
+          await writeAudit(tx, auditContext(request), {
+            action: 'shift.updated', entityType: 'shift', entityId: id, ...change,
+            ...(previousDefault ? { meta: { previousDefaultShift: previousDefault.name } } : {}),
+          })
+        }
+        return updated
       })
     } catch (e) {
       if (e?.code === 'P2002') return reply.code(409).send({ error: '班別名稱已存在' })
@@ -154,11 +174,18 @@ export default async function shiftRoutes(fastify) {
     if (futureCount > 0) {
       return reply.code(400).send({ error: `仍有 ${futureCount} 筆今天以後的排班使用此班別，請先改排` })
     }
-    return fastify.prisma.shift.update({
-      where: { id },
-      data: { deletedAt: new Date(), name: `${shift.name}（已停用 ${Date.now()}）` },
-      select: SHIFT_SELECT,
-    })
+    const [deleted] = await fastify.prisma.$transaction([
+      fastify.prisma.shift.update({
+        where: { id },
+        data: { deletedAt: new Date(), name: `${shift.name}（已停用 ${Date.now()}）` },
+        select: SHIFT_SELECT,
+      }),
+      writeAudit(fastify.prisma, auditContext(request), {
+        action: 'shift.deleted', entityType: 'shift', entityId: id,
+        before: { name: shift.name, startTime: shift.startTime, endTime: shift.endTime, breakMinutes: shift.breakMinutes },
+      }),
+    ])
+    return deleted
   })
 
   // GET /api/admin/schedule?month=YYYY-MM&departmentId= — 員工 × 當月指派（前端組矩陣）
@@ -262,17 +289,38 @@ export default async function shiftRoutes(fastify) {
       return reply.code(409).send({ error: 'schedule_compliance_warning', violations })
     }
 
-    await fastify.prisma.$transaction(changes.map((c) => {
-      const date = dateStrToDate(c.date)
-      if (c.shiftId === null) {
-        return fastify.prisma.shiftAssignment.deleteMany({ where: { userId: c.userId, date } })
-      }
-      return fastify.prisma.shiftAssignment.upsert({
-        where: { userId_date: { userId: c.userId, date } },
-        update: { shiftId: c.shiftId },
-        create: { userId: c.userId, date, shiftId: c.shiftId },
-      })
-    }))
+    // 稽核：一次存檔記一筆，逐格記 from → to（略過沒有實際變動的格子）
+    const dates = [...new Set(changes.map((c) => c.date))].map(dateStrToDate)
+    const current = await fastify.prisma.shiftAssignment.findMany({
+      where: { userId: { in: userIds }, date: { in: dates } },
+      select: { userId: true, date: true, shiftId: true },
+    })
+    const currentByKey = new Map(current.map((a) => [`${a.userId}|${a.date.toISOString().slice(0, 10)}`, a.shiftId]))
+    const cellChanges = changes
+      .map((c) => ({ userId: c.userId, date: c.date, from: currentByKey.get(`${c.userId}|${c.date}`) ?? null, to: c.shiftId }))
+      .filter((c) => c.from !== c.to)
+
+    await fastify.prisma.$transaction([
+      ...changes.map((c) => {
+        const date = dateStrToDate(c.date)
+        if (c.shiftId === null) {
+          return fastify.prisma.shiftAssignment.deleteMany({ where: { userId: c.userId, date } })
+        }
+        return fastify.prisma.shiftAssignment.upsert({
+          where: { userId_date: { userId: c.userId, date } },
+          update: { shiftId: c.shiftId },
+          create: { userId: c.userId, date, shiftId: c.shiftId },
+        })
+      }),
+      ...(cellChanges.length ? [writeAudit(fastify.prisma, auditContext(request), {
+        action: 'schedule.assignments_updated', entityType: 'schedule',
+        meta: {
+          changes: cellChanges,
+          complianceOverride: violations.length > 0,
+          violations: violations.length > 0 ? violations : undefined,
+        },
+      })] : []),
+    ])
     return { updated: changes.length }
   })
 }

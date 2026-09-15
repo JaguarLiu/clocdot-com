@@ -5,6 +5,8 @@ import { validateImportRows, IMPORT_MAX_ROWS } from '../../services/userImport.j
 import { normalizeDepartmentName } from '../../services/orgChart.js'
 import { parseRoleId } from '../../services/rbac.js'
 import { p2002HasField } from '../../utils/prismaError.js'
+import { getTodayStart } from '../../utils/timezone.js'
+import { auditContext, diffFields, writeAudit } from '../../services/audit.js'
 
 const PASSWORD_MIN_LENGTH = 8
 const BCRYPT_ROUNDS = 10
@@ -87,26 +89,36 @@ fastify.post('/api/admin/users', { preHandler: fastify.requireModule('employees'
 
   const hash = await bcrypt.hash(password, BCRYPT_ROUNDS)
 
+  const data = {
+    email: email.trim().toLowerCase(),
+    name: name?.trim() || null,
+    empNo: empNo ?? null,
+    companyId: request.companyId,
+    ...(departmentId ? { departmentId } : {}),
+    ...(resolvedRoleId ? { roleId: resolvedRoleId } : {}),
+    ...(timezone ? { timezone } : {}),
+    ...(companyDefaultShift ? { defaultShiftId: companyDefaultShift.id } : {}),
+    ...(employmentType ? { employmentType } : {}),
+    password: hash,
+    ...(hireDate ? { hireDate: new Date(hireDate) } : {}),
+  }
+
   try {
-    const user = await fastify.prisma.user.create({
-      data: {
-        email: email.trim().toLowerCase(),
-        name: name?.trim() || null,
-        empNo: empNo ?? null,
-        companyId: request.companyId,
-        ...(departmentId ? { departmentId } : {}),
-        ...(resolvedRoleId ? { roleId: resolvedRoleId } : {}),
-        ...(timezone ? { timezone } : {}),
-        ...(companyDefaultShift ? { defaultShiftId: companyDefaultShift.id } : {}),
-        ...(employmentType ? { employmentType } : {}),
-        password: hash,
-        ...(hireDate ? { hireDate: new Date(hireDate) } : {}),
-      },
-      select: {
-        id: true, email: true, name: true, empNo: true, avatar: true,
-        timezone: true, lockedAt: true, failedLoginCount: true,
-        createdAt: true,
-      },
+    const user = await fastify.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data,
+        select: {
+          id: true, email: true, name: true, empNo: true, avatar: true,
+          timezone: true, lockedAt: true, failedLoginCount: true,
+          createdAt: true,
+        },
+      })
+      // 密碼雜湊與公司 id 不進稽核
+      const { companyId: _companyId, password: _password, ...auditAfter } = data
+      await writeAudit(tx, auditContext(request), {
+        action: 'user.created', entityType: 'user', entityId: created.id, targetUserId: created.id, after: auditAfter,
+      })
+      return created
     })
     return { ...user, hasPassword: Boolean(hash) }
   } catch (err) {
@@ -180,8 +192,16 @@ fastify.post('/api/admin/users/import', { preHandler: fastify.requireModule('emp
   }))
 
   try {
-    const created = await fastify.prisma.$transaction(
-      prepared.map((v) => fastify.prisma.user.create({
+    // 批次匯入記一筆稽核（不含初始密碼）；與建立同一個 batch transaction
+    const importAudit = writeAudit(fastify.prisma, auditContext(request), {
+      action: 'user.imported', entityType: 'user',
+      meta: {
+        count: prepared.length,
+        users: prepared.map((v) => ({ email: v.email, name: v.name, empNo: v.empNo, withSalaryProfile: Boolean(v.salaryProfile) })),
+      },
+    })
+    const results = await fastify.prisma.$transaction([
+      ...prepared.map((v) => fastify.prisma.user.create({
         data: {
           email: v.email,
           name: v.name,
@@ -194,7 +214,9 @@ fastify.post('/api/admin/users/import', { preHandler: fastify.requireModule('emp
         },
         select: { id: true, email: true, name: true, empNo: true },
       })),
-    )
+      importAudit,
+    ])
+    const created = results.slice(0, prepared.length)
     return { created: created.map((u, i) => ({ ...u, password: prepared[i].password })) }
   } catch (err) {
     if (err?.code === 'P2002') {
@@ -210,7 +232,10 @@ fastify.patch('/api/admin/users/:id', { preHandler: fastify.requireModule('emplo
   const target = await assertOwnedByCompany(
     (uid) => fastify.prisma.user.findUnique({
       where: { id: uid },
-      select: { id: true, companyId: true, deletedAt: true, departmentId: true },
+      select: {
+        id: true, companyId: true, deletedAt: true, departmentId: true,
+        name: true, empNo: true, timezone: true, hireDate: true, roleId: true, defaultShiftId: true, employmentType: true,
+      },
     }),
     id, request.companyId, reply,
     (rec) => rec.companyId,
@@ -276,9 +301,18 @@ fastify.patch('/api/admin/users/:id', { preHandler: fastify.requireModule('emplo
   try {
     const updated = await fastify.prisma.$transaction(async (tx) => {
       // 改為正常班 → 清除今天以後的排班指派（殘留指派會蓋過預設班判定）；過去指派保留
+      let clearedAssignments = 0
       if (data.employmentType === 'regular') {
-        await tx.shiftAssignment.deleteMany({
+        const res = await tx.shiftAssignment.deleteMany({
           where: { userId: id, date: { gte: getTodayStart() } },
+        })
+        clearedAssignments = res.count
+      }
+      const change = diffFields(target, data)
+      if (change) {
+        await writeAudit(tx, auditContext(request), {
+          action: 'user.updated', entityType: 'user', entityId: id, targetUserId: id, ...change,
+          ...(clearedAssignments ? { meta: { clearedFutureAssignments: clearedAssignments } } : {}),
         })
       }
       return tx.user.update({

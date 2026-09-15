@@ -164,3 +164,56 @@ test('admin 駁回 pending 申請（無 step 舊資料相容）→ rejected', as
   assert.equal(r.ok, true)
   assert.equal(state.leave.status, 'rejected')
 })
+
+// ── 稽核紀錄 ──
+const AUDIT = { companyId: null, actorId: 'mgr', ip: '1.1.1.1', userAgent: 'ua' }
+function withAuditLog(db) {
+  db.state.audits = []
+  db.tx.auditLog = { create: async ({ data }) => { db.state.audits.push(data); return data } }
+  return db
+}
+
+test('稽核：單層核准 → 記 step_approved 與 leave.approved，對象為申請人', async () => {
+  const { prisma, state } = withAuditLog(makeDb({ steps: [STEP()], leave: LEAVE() }))
+  const r = await decideStepByApprover(prisma, { stepId: 'S1', userId: 'mgr', decision: 'approve', audit: AUDIT })
+  assert.equal(r.ok, true)
+  assert.deepEqual(state.audits.map((a) => a.action), ['approval.step_approved', 'leave.approved'])
+  for (const a of state.audits) {
+    assert.equal(a.targetUserId, 'emp')
+    assert.equal(a.companyId, 'c1')
+    assert.equal(a.actorId, 'mgr')
+    assert.equal(a.entityId, 'L1')
+  }
+  assert.equal(state.audits[0].meta.level, 1)
+})
+
+test('稽核：兩層鏈第一層核准 → 只記 step_approved', async () => {
+  const steps = [STEP(), STEP({ id: 'S2', level: 2, approverId: 'boss' })]
+  const { prisma, state } = withAuditLog(makeDb({ steps, leave: LEAVE() }))
+  await decideStepByApprover(prisma, { stepId: 'S1', userId: 'mgr', decision: 'approve', audit: AUDIT })
+  assert.deepEqual(state.audits.map((a) => a.action), ['approval.step_approved'])
+})
+
+test('稽核：駁回 → 記 step_rejected 與 leave.rejected', async () => {
+  const { prisma, state } = withAuditLog(makeDb({ steps: [STEP()], leave: LEAVE() }))
+  await decideStepByApprover(prisma, { stepId: 'S1', userId: 'mgr', decision: 'reject', note: 'no', audit: AUDIT })
+  assert.deepEqual(state.audits.map((a) => a.action), ['approval.step_rejected', 'leave.rejected'])
+  assert.equal(state.audits[0].meta.note, 'no')
+})
+
+test('稽核：admin 越級核准 → leave.approved 帶 byAdmin 與略過層數', async () => {
+  const steps = [STEP(), STEP({ id: 'S2', level: 2, approverId: 'boss' })]
+  const { prisma, state } = withAuditLog(makeDb({ steps, leave: LEAVE() }))
+  await adminFinalize(prisma, {
+    requestType: 'leave', requestId: 'L1', decision: 'approve', decidedById: 'admin', audit: { ...AUDIT, actorId: 'admin' },
+  })
+  assert.equal(state.audits.length, 1)
+  assert.equal(state.audits[0].action, 'leave.approved')
+  assert.deepEqual([state.audits[0].meta.byAdmin, state.audits[0].meta.skippedSteps], [true, 2])
+})
+
+test('稽核：驗證失敗（非指派人）不寫紀錄', async () => {
+  const { prisma, state } = withAuditLog(makeDb({ steps: [STEP()], leave: LEAVE() }))
+  await decideStepByApprover(prisma, { stepId: 'S1', userId: 'stranger', decision: 'approve', audit: AUDIT })
+  assert.equal(state.audits.length, 0)
+})

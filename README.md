@@ -20,7 +20,10 @@ ClocDot 是為中小企業設計的多租戶人資、差勤與薪資管理系統
 - 請假申請、餘額查詢、取消申請及公司假勤日曆
 - 加班時數推導、申請及法規提示
 - 主管待簽核工作匣
+- 申請進度時間軸：每張請假／補卡／加班單可展開查看簽核關卡、簽核人與核准時間
+- 我的紀錄：打卡、申請流程、帳號安全事件，以及管理員替自己調整過的出勤（含變更前後）
 - 個人薪資單
+- 打卡鐘樣式：經典打卡機或小狗 Shiro，打卡後依遲到／早退播放不同動畫
 - 繁體中文／英文介面
 
 ### 管理後台
@@ -36,6 +39,7 @@ ClocDot 是為中小企業設計的多租戶人資、差勤與薪資管理系統
 - 假別額度、扣薪比例與週年制／曆年制設定
 - 薪資資料、月薪／時薪、津貼、投保資料及自願提繳
 - 月薪資批次、人工調整、特休結清、鎖定與匯出
+- 稽核紀錄：依日期、類別、操作者／對象員工篩選，展開可看欄位變更前後、附加資訊與來源 IP
 - 問題回報
 
 ### 後端能力
@@ -45,6 +49,7 @@ ClocDot 是為中小企業設計的多租戶人資、差勤與薪資管理系統
 - 部門範圍與模組層級 RBAC
 - 沿部門組織樹建立的多層簽核流程
 - 交易式簽核決議與重複執行防護
+- 稽核紀錄（append-only）：寫入資料的操作與業務寫入同一個 transaction 記錄，敏感欄位遮蔽，每日依保存期限清理
 - 台灣加班、休息日、例假及七休一等合規檢查
 - Redis 快取與 rate-limit；Redis 無法使用時可降級運作
 - 請求 schema 驗證、安全 headers 及通用錯誤處理
@@ -80,21 +85,21 @@ flowchart LR
 Clocdot/
 ├── client/                 員工 PWA
 │   └── src/
-│       ├── pages/          打卡、歷史、補卡、請假、加班、薪資單
+│       ├── pages/          打卡、歷史、補卡、請假、加班、薪資單、我的紀錄
 │       ├── components/     共用 UI 與 PWA 元件
 │       ├── context/        登入狀態
 │       ├── hooks/          出勤、網路及安裝狀態
 │       └── services/       API、認證與離線佇列
 ├── admin/                  管理後台
 │   └── src/
-│       ├── pages/          報表、審核、員工、排班、薪資、設定
+│       ├── pages/          報表、審核、員工、排班、薪資、設定、稽核紀錄
 │       ├── components/     組織圖、員工／班別／薪資編輯元件
 │       └── services/       API 與認證
 ├── server/
 │   ├── src/
 │   │   ├── routes/         Fastify REST endpoints
 │   │   ├── services/       差勤、假勤、簽核、法遵與薪資邏輯
-│   │   ├── plugins/        Prisma、Redis、JWT、i18n
+│   │   ├── plugins/        Prisma、Redis、JWT、i18n、稽核紀錄清理
 │   │   ├── data/           台灣假日及薪資級距資料
 │   │   └── utils/          時區、租戶、IP、CSV 等工具
 │   ├── prisma/             Schema、migration 與資料修正 SQL
@@ -123,6 +128,8 @@ erDiagram
   AttendanceRecord ||--o{ CorrectionRequest : corrects
   PayrollRun ||--o{ PayrollItem : contains
 ```
+
+`AuditLog` 刻意不建外鍵（被操作的資料刪除或停用後紀錄仍需保留），以 `companyId`、`actorId`、`targetUserId`、`entityType` + `entityId` 關聯，未列在上圖。
 
 完整欄位與約束請以 [`server/prisma/schema.prisma`](server/prisma/schema.prisma) 為準。
 
@@ -215,6 +222,8 @@ Vite 開發伺服器會把 `/api` proxy 到 `http://localhost:3000`。
 | `BOOTSTRAP_ADMIN_EMAIL` | bootstrap 時 | 第一位管理員 email |
 | `BOOTSTRAP_ADMIN_NAME` | bootstrap 時 | 第一位管理員姓名 |
 | `BOOTSTRAP_ADMIN_PASSWORD` | 否 | 僅供非互動式自動化；設定後會略過終端機提示，用完應立即移除 |
+| `AUDIT_LOG_RETENTION_DAYS` | 否 | 稽核紀錄保存天數，預設 `1825`（5 年），低於 `365` 會拉到 `365` |
+| `AUDIT_LOG_RETENTION_DISABLED` | 否 | 設為 `true` 停用每日清理（例如由 DB 層自行歸檔時） |
 
 ### Client／Admin build-time
 
@@ -242,7 +251,7 @@ npm run db:push
 npm run db:studio
 ```
 
-測試使用 Node.js 內建 test runner，核心覆蓋簽核競態、租戶／組織範圍、排班合規、假勤、加班、薪資計算、登入鎖定、i18n 與 route schema。
+測試使用 Node.js 內建 test runner，核心覆蓋簽核競態、租戶／組織範圍、排班合規、假勤、加班、薪資計算、登入鎖定、稽核紀錄、i18n 與 route schema。admin／client 的測試另外會比對 server 的稽核動作清單，確保每個動作都有中英文標籤。
 
 ## Docker
 
@@ -271,7 +280,9 @@ docker compose up -d --build
 - 密碼使用 bcrypt 雜湊，JWT 有效期目前為一天。
 - 員工停用後，既有 JWT 會在後續請求被拒絕。
 - 生產環境必須設定獨立且不可預測的 `JWT_SECRET`。
-- 出勤和薪資屬敏感資料；正式部署前應建立 PostgreSQL 備份、還原演練、監控及稽核紀錄策略。
+- 出勤和薪資屬敏感資料；正式部署前應建立 PostgreSQL 備份、還原演練與監控。
+- 會改資料的操作都會寫入稽核紀錄（`POST /api/admin/issues` 問題回報刻意不記）；密碼雜湊、初始密碼不入紀錄，銀行帳號只留末四碼。預設保存 5 年，出勤紀錄依勞基法同樣須保存 5 年。
+- 員工端只看得到與自己有關的流程與出勤事件，看不到薪資、權限類紀錄及操作者 IP。
 - `server/src/data/twHolidays` 與 `server/src/data/twPayroll` 是年度資料，跨年度前需更新並驗證。
 - 台灣勞動法規與薪資級距資料僅為方便對照之參考，不構成法律意見；實際適用請洽專業人士並以主管機關公告為準。
 
@@ -286,8 +297,11 @@ API 統一使用 `/api` prefix，主要資源包含：
 - `/api/overtime-requests`：加班
 - `/api/approvals`：主管簽核
 - `/api/payroll/me`：個人薪資單
+- `/api/my/activity`：我的紀錄（`category=attendance|request|account`）
+- `/api/requests/:type/:id/progress`：申請的簽核關卡與時間軸
 - `/api/admin/*`：報表、員工、組織、設定與薪資管理
 - `/api/admin/shifts`、`/api/admin/schedule`：班別與排班
+- `/api/admin/audit-logs`：稽核紀錄查詢（模組 `audit-log`）
 - `/api/health`：服務檢查
 
 路由的實際 request schema 與授權條件請以 [`server/src/routes`](server/src/routes) 為準。
@@ -302,8 +316,8 @@ API 統一使用 `/api` prefix，主要資源包含：
 
 ### 已知限制
 
-- 未內建稽核日誌（誰在何時查看或修改了哪筆薪資紀錄）。
-- 沒有資料保存期限或自動刪除機制，個資刪除需直接操作資料庫，詳見 [PRIVACY.md](PRIVACY.md)。
+- 稽核紀錄只涵蓋寫入操作與登入事件，不記錄「查看」或「匯出」（例如誰看了哪張薪資單）。
+- 除稽核紀錄會依 `AUDIT_LOG_RETENTION_DAYS` 自動清理外，出勤、請假、薪資等業務資料沒有保存期限或自動刪除機制，個資刪除需直接操作資料庫，詳見 [PRIVACY.md](PRIVACY.md)。
 - 自動化測試集中在後端業務邏輯；前端與端對端流程尚未有瀏覽器整合測試。
 - 台灣假日與勞健保級距為年度資料，跨年度需手動更新，詳見 [`server/src/data/README.md`](server/src/data/README.md)。
 - 僅支援單一時區（`Asia/Taipei`）與繁體中文／英文兩種介面。

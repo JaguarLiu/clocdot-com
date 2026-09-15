@@ -5,6 +5,7 @@ import { buildPayrollItems, applyAdjustments, validateAdjustments } from '../../
 import { computeCashout } from '../../services/leaveCashout.js'
 import { buildBalances } from '../../services/leaveBalance.js'
 import { toCSV } from '../../utils/csv.js'
+import { auditContext, diffFields, writeAudit } from '../../services/audit.js'
 
 export function registerPayrollRoutes(fastify, S, { assembleSettlement, loadDeductionContext }) {
 // GET /api/admin/salary-profiles — 全公司薪資主檔總覽（標示未設定者）
@@ -67,11 +68,19 @@ fastify.put('/api/admin/users/:id/salary-profile', { preHandler: fastify.require
   const result = normalizeSalaryProfile(request.body, { payType })
   if (!result.ok) return reply.code(400).send({ error: result.error })
 
-  const profile = await fastify.prisma.salaryProfile.upsert({
-    where: { userId: id },
-    create: { userId: id, ...result.value },
-    update: result.value,
-  })
+  const previous = await fastify.prisma.salaryProfile.findUnique({ where: { userId: id } })
+  const change = diffFields(previous, result.value)
+  const [profile] = await fastify.prisma.$transaction([
+    fastify.prisma.salaryProfile.upsert({
+      where: { userId: id },
+      create: { userId: id, ...result.value },
+      update: result.value,
+    }),
+    ...(change ? [writeAudit(fastify.prisma, auditContext(request), {
+      action: 'salary_profile.updated', entityType: 'salary_profile', entityId: id, targetUserId: id,
+      ...change, meta: { created: !previous },
+    })] : []),
+  ])
   return profile
 })
 
@@ -92,7 +101,8 @@ async function loadCashoutMap(companyId, month) {
 }
 
 // 重算某月 draft run：保留 adjustments、載入換薪 earning。回傳 { ...run, skipped }
-async function rebuildRun(request, month) {
+// auditGenerate：由「產生 / 重算」按鈕觸發時為 true，在同一個 transaction 記 payroll.run_generated
+async function rebuildRun(request, month, { auditGenerate = false } = {}) {
   const year = Number(month.slice(0, 4))
   const settlementRows = await assembleSettlement(request, month)
   const { company, leaveDeductRates } = await loadDeductionContext(request.companyId)
@@ -133,6 +143,12 @@ async function rebuildRun(request, month) {
         where: { payrollRunId_userId: { payrollRunId: r.id, userId: it.userId } },
         create: { payrollRunId: r.id, userId: it.userId, adjustments, ...denorm },
         update: denorm,
+      })
+    }
+    if (auditGenerate) {
+      await writeAudit(tx, auditContext(request), {
+        action: 'payroll.run_generated', entityType: 'payroll_run', entityId: r.id,
+        meta: { month, recalculated: Boolean(existing), itemCount: items.length, skippedCount: skipped.length },
       })
     }
     return tx.payrollRun.findUnique({ where: { id: r.id }, include: { items: { orderBy: { empNo: 'asc' } } } })
@@ -180,7 +196,7 @@ fastify.post('/api/admin/payroll-runs', { preHandler: fastify.requireModule('pay
   const existing = await loadRun(request.companyId, month)
   if (existing?.status === 'locked') return reply.code(409).send({ error: '已鎖定，請先解鎖' })
 
-  return rebuildRun(request, month)
+  return rebuildRun(request, month, { auditGenerate: true })
 })
 
 // POST /api/admin/payroll-runs/:month/cashout — 特休換薪（單選/全選），算金額並重算
@@ -201,6 +217,7 @@ fastify.post('/api/admin/payroll-runs/:month/cashout', { preHandler: fastify.req
     include: { salaryProfile: true, company: true },
   })
   const effectiveDate = new Date(Date.UTC(year, Number(month.slice(5, 7)) - 1, 1))
+  const cashoutLog = []
 
   for (const user of users) {
     if (!user.salaryProfile) continue
@@ -214,9 +231,17 @@ fastify.post('/api/admin/payroll-runs/:month/cashout', { preHandler: fastify.req
     const monthlyWage = user.salaryProfile.baseSalary + (user.salaryProfile.allowances ?? []).reduce((s, a) => s + a.amount, 0)
     const c = computeCashout({ remainingMinutes: available, monthlyWage })
     if (c.amount <= 0 || c.minutes <= 0) {
-      if (existing) await fastify.prisma.leaveCashout.delete({ where: { id: existing.id } })
+      if (existing) {
+        await fastify.prisma.leaveCashout.delete({ where: { id: existing.id } })
+        cashoutLog.push({ userId: user.id, from: { minutes: existing.minutes, amount: existing.amount }, to: null })
+      }
       continue
     }
+    cashoutLog.push({
+      userId: user.id,
+      from: existing ? { minutes: existing.minutes, amount: existing.amount } : null,
+      to: { minutes: c.minutes, amount: c.amount },
+    })
     await fastify.prisma.leaveCashout.upsert({
       where: { userId_month: { userId: user.id, month } },
       create: {
@@ -227,6 +252,10 @@ fastify.post('/api/admin/payroll-runs/:month/cashout', { preHandler: fastify.req
     })
   }
 
+  await writeAudit(fastify.prisma, auditContext(request), {
+    action: 'payroll.cashout_applied', entityType: 'payroll_run', entityId: run.id,
+    meta: { month, requestedUserIds: userIds, results: cashoutLog },
+  })
   return rebuildRun(request, month)
 })
 
@@ -241,10 +270,16 @@ fastify.patch('/api/admin/payroll-runs/:month/items/:userId', { preHandler: fast
   const v = validateAdjustments(request.body?.adjustments)
   if (!v.ok) return reply.code(400).send({ error: v.error })
   const { adjustmentsTotal, netPay } = applyAdjustments(item.payslip, v.value)
-  return fastify.prisma.payrollItem.update({
-    where: { id: item.id },
-    data: { adjustments: v.value, adjustmentsTotal, netPay },
-  })
+  const data = { adjustments: v.value, adjustmentsTotal, netPay }
+  const change = diffFields(item, data)
+  const [updated] = await fastify.prisma.$transaction([
+    fastify.prisma.payrollItem.update({ where: { id: item.id }, data }),
+    ...(change ? [writeAudit(fastify.prisma, auditContext(request), {
+      action: 'payroll.item_adjusted', entityType: 'payroll_item', entityId: item.id, targetUserId: userId,
+      ...change, meta: { month },
+    })] : []),
+  ])
+  return updated
 })
 
 // POST /api/admin/payroll-runs/:month/lock
@@ -253,10 +288,16 @@ fastify.post('/api/admin/payroll-runs/:month/lock', { preHandler: fastify.requir
   const run = await loadRun(request.companyId, month)
   if (!run) return reply.code(404).send({ error: '尚未結算' })
   if (run.status === 'locked') return reply.code(409).send({ error: '已是鎖定狀態' })
-  await fastify.prisma.payrollRun.update({
-    where: { id: run.id },
-    data: { status: 'locked', lockedAt: new Date(), lockedById: request.user.id },
-  })
+  await fastify.prisma.$transaction([
+    fastify.prisma.payrollRun.update({
+      where: { id: run.id },
+      data: { status: 'locked', lockedAt: new Date(), lockedById: request.user.id },
+    }),
+    writeAudit(fastify.prisma, auditContext(request), {
+      action: 'payroll.run_locked', entityType: 'payroll_run', entityId: run.id,
+      meta: { month, itemCount: run.items.length, netTotal: run.items.reduce((s, i) => s + i.netPay, 0) },
+    }),
+  ])
   return { ok: true }
 })
 
@@ -266,10 +307,17 @@ fastify.post('/api/admin/payroll-runs/:month/unlock', { preHandler: fastify.requ
   const run = await loadRun(request.companyId, month)
   if (!run) return reply.code(404).send({ error: '尚未結算' })
   if (run.status !== 'locked') return reply.code(409).send({ error: '目前非鎖定狀態' })
-  await fastify.prisma.payrollRun.update({
-    where: { id: run.id },
-    data: { status: 'draft', lockedAt: null, lockedById: null },
-  })
+  await fastify.prisma.$transaction([
+    fastify.prisma.payrollRun.update({
+      where: { id: run.id },
+      data: { status: 'draft', lockedAt: null, lockedById: null },
+    }),
+    writeAudit(fastify.prisma, auditContext(request), {
+      action: 'payroll.run_unlocked', entityType: 'payroll_run', entityId: run.id,
+      before: { lockedAt: run.lockedAt, lockedById: run.lockedById },
+      meta: { month },
+    }),
+  ])
   return { ok: true }
 })
 

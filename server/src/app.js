@@ -6,6 +6,7 @@ import prismaPlugin from './plugins/prisma.js'
 import redisPlugin from './plugins/redis.js'
 import authPlugin from './plugins/auth.js'
 import i18nPlugin from './plugins/i18n.js'
+import auditRetentionPlugin from './plugins/auditRetention.js'
 import authRoutes from './routes/auth.js'
 import attendanceRoutes from './routes/attendance.js'
 import correctionRoutes from './routes/correction.js'
@@ -17,6 +18,7 @@ import payrollRoutes from './routes/payroll.js'
 import approvalRoutes from './routes/approvals.js'
 import shiftRoutes from './routes/shifts.js'
 import { parseTrustProxy } from './utils/trustProxy.js'
+import activityRoutes from './routes/activity.js'
 
 // 反向代理後面才信任 X-Forwarded-For，request.ip 才會是真實 client IP (WiFi 打卡驗證用)。
 // 預設不信任；部署在 proxy 後面時用 TRUST_PROXY 指定跳數或 proxy 位址（見 utils/trustProxy.js）。
@@ -62,6 +64,7 @@ fastify.setErrorHandler((err, request, reply) => {
 await fastify.register(prismaPlugin)
 await fastify.register(redisPlugin)
 await fastify.register(authPlugin)
+await fastify.register(auditRetentionPlugin)
 
 // Routes
 await fastify.register(authRoutes)
@@ -74,6 +77,7 @@ await fastify.register(holidayRoutes)
 await fastify.register(payrollRoutes)
 await fastify.register(approvalRoutes)
 await fastify.register(shiftRoutes)
+await fastify.register(activityRoutes)
 
 // Health check
 fastify.get('/api/health', async () => ({ status: 'ok' }))

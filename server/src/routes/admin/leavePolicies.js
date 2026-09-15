@@ -1,4 +1,5 @@
 import { isValidLeaveType, LEAVE_TYPES } from '../../services/leaveTypes.js'
+import { auditContext, diffFields, writeAudit } from '../../services/audit.js'
 
 export function registerLeavePolicyRoutes(fastify, S) {
 // GET /api/admin/leave-policies — 列出本公司假別政策
@@ -57,6 +58,22 @@ fastify.put('/api/admin/leave-policies', { preHandler: fastify.requireModule('se
       update: { annualQuotaMinutes: p.annualQuotaMinutes, deductRate: p.deductRate ?? null },
     })
   })
+
+  // 稽核：before / after 以假別為 key，值為 { annualQuotaMinutes, deductRate }；null = 未設（無上限）
+  const existingRows = await fastify.prisma.leavePolicy.findMany({ where: { companyId: request.companyId } })
+  const pick = (r) => (r ? { annualQuotaMinutes: r.annualQuotaMinutes, deductRate: r.deductRate ?? null } : null)
+  const beforeByType = Object.fromEntries(existingRows.map((r) => [r.leaveType, pick(r)]))
+  const afterByType = { ...beforeByType }
+  for (const p of policies) {
+    afterByType[p.leaveType] = p.annualQuotaMinutes === null ? null : pick(p)
+  }
+  const change = diffFields(beforeByType, afterByType, policies.map((p) => p.leaveType))
+  if (change) {
+    ops.push(writeAudit(fastify.prisma, auditContext(request), {
+      action: 'leave_policy.updated', entityType: 'leave_policy', entityId: request.companyId, ...change,
+    }))
+  }
+
   await fastify.prisma.$transaction(ops)
   return { ok: true }
 })

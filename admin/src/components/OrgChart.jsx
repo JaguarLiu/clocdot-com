@@ -25,6 +25,7 @@ const GRANTABLE_MODULES = [
   { key: 'employees', labelKey: 'nav.employees' },
   { key: 'payroll', labelKey: 'nav.payroll' },
   { key: 'schedule', labelKey: 'nav.schedule' },
+  { key: 'audit-log', labelKey: 'nav.auditLog' },
 ]
 
 const MODULE_LABEL_KEY = Object.fromEntries(GRANTABLE_MODULES.map((m) => [m.key, m.labelKey]))

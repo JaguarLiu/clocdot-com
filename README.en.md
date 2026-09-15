@@ -19,6 +19,9 @@ The default time zone is `Asia/Taipei`. The project includes reference data for 
 - Derived overtime hours, overtime applications, and compliance notices
 - Manager approval inbox
 - Personal payslips
+- Request progress timeline: expand any leave, correction, or overtime request to see approval steps, approvers, and decision times
+- My activity: punches, request events, account-security events, and attendance adjustments made on your behalf (with before/after values)
+- Clock styles: a classic punch clock or Shiro the puppy, with a different animation for on-time and late/early punches
 - Traditional Chinese and English interfaces
 
 ### Admin console
@@ -34,6 +37,7 @@ The default time zone is `Asia/Taipei`. The project includes reference data for 
 - Leave quotas, salary deduction ratios, and anniversary/calendar-year policies
 - Salary profiles, monthly/hourly pay, allowances, insurance data, and voluntary pension contributions
 - Payroll runs, manual adjustments, annual-leave cash-out, locking, and export
+- Audit log: filter by date, category, actor, or affected employee; expand an entry to see field-level before/after values, metadata, and source IP
 - Issue reporting
 
 ### Backend capabilities
@@ -43,6 +47,7 @@ The default time zone is `Asia/Taipei`. The project includes reference data for 
 - Department-scoped and module-level RBAC
 - Multi-level approval flows derived from the department hierarchy
 - Transactional approval decisions and idempotency protection
+- Append-only audit log written in the same transaction as the business change, with sensitive fields masked and a daily retention purge
 - Taiwan overtime, rest-day, regular-day-off, and one-day-off-in-seven compliance checks
 - Redis caching and rate limiting, with graceful degradation when Redis is unavailable
 - Request schema validation, security headers, and centralized error handling
@@ -78,21 +83,21 @@ The three workspaces share one API and database:
 ClocDot/
 ├── client/                 Employee PWA
 │   └── src/
-│       ├── pages/          Attendance, history, corrections, leave, overtime, payslips
+│       ├── pages/          Attendance, history, corrections, leave, overtime, payslips, activity
 │       ├── components/     Shared UI and PWA components
 │       ├── context/        Authentication state
 │       ├── hooks/          Attendance, connectivity, and installation
 │       └── services/       API, authentication, and offline queue
 ├── admin/                  Admin console
 │   └── src/
-│       ├── pages/          Reports, reviews, employees, schedules, payroll, settings
+│       ├── pages/          Reports, reviews, employees, schedules, payroll, settings, audit log
 │       ├── components/     Organization, employee, shift, and payroll editors
 │       └── services/       API and authentication
 ├── server/
 │   ├── src/
 │   │   ├── routes/         Fastify REST endpoints
 │   │   ├── services/       Attendance, leave, approval, compliance, and payroll logic
-│   │   ├── plugins/        Prisma, Redis, JWT, and i18n
+│   │   ├── plugins/        Prisma, Redis, JWT, i18n, and audit-log retention
 │   │   ├── data/           Taiwan holiday and payroll reference data
 │   │   └── utils/          Time zone, tenancy, IP, CSV, and other utilities
 │   ├── prisma/             Schema, migrations, and data-maintenance SQL
@@ -213,6 +218,8 @@ The complete example is available in [`.env.example`](.env.example).
 | `BOOTSTRAP_ADMIN_EMAIL` | For bootstrap | Email of the first administrator |
 | `BOOTSTRAP_ADMIN_NAME` | For bootstrap | Name of the first administrator |
 | `BOOTSTRAP_ADMIN_PASSWORD` | No | Non-interactive automation only; skips the terminal prompt and should be removed straight after use |
+| `AUDIT_LOG_RETENTION_DAYS` | No | Audit-log retention in days; defaults to `1825` (5 years), values below `365` are raised to `365` |
+| `AUDIT_LOG_RETENTION_DISABLED` | No | Set to `true` to disable the daily purge (for example when archiving at the database layer) |
 
 ### Client/admin build-time variables
 
@@ -284,8 +291,11 @@ All API routes use the `/api` prefix. Main resources include:
 - `/api/overtime-requests`: overtime
 - `/api/approvals`: manager approvals
 - `/api/payroll/me`: personal payslips
+- `/api/my/activity`: my activity (`category=attendance|request|account`)
+- `/api/requests/:type/:id/progress`: approval steps and timeline for one request
 - `/api/admin/*`: reports, employees, organization, settings, and payroll management
 - `/api/admin/shifts`, `/api/admin/schedule`: shifts and scheduling
+- `/api/admin/audit-logs`: audit-log queries (module `audit-log`)
 - `/api/health`: service health
 
 See [`server/src/routes`](server/src/routes) for the actual request schemas and authorization requirements.
@@ -300,8 +310,8 @@ See [`server/src/routes`](server/src/routes) for the actual request schemas and 
 
 ### Known limitations
 
-- No built-in audit log (who viewed or changed which payroll record, and when).
-- No data-retention or automatic deletion mechanism; erasing personal data requires direct database work. See [PRIVACY.md](PRIVACY.md).
+- The audit log covers write operations and sign-in events only; it does not record views or exports (for example, who opened which payslip).
+- Apart from the audit log, which is purged according to `AUDIT_LOG_RETENTION_DAYS`, attendance, leave, and payroll data have no retention or automatic deletion mechanism; erasing personal data requires direct database work. See [PRIVACY.md](PRIVACY.md).
 - Automated tests concentrate on backend business logic; there is no browser-based end-to-end coverage yet.
 - Taiwan holidays and insurance brackets are annual data and must be updated manually. See [`server/src/data/README.md`](server/src/data/README.md).
 - Single timezone (`Asia/Taipei`) and two locales (Traditional Chinese, English) only.
